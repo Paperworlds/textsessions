@@ -84,6 +84,40 @@ def scan() -> None:
     run_init(interactive=False)
 
 
+@main.command()
+@click.option("--repo", "-r", "repo_label", default="", help="Limit to one repo label")
+def reindex(repo_label: str) -> None:
+    """Rebuild session indexes from .jsonl files for configured repos."""
+    from .config import detect_claude_dirs
+    from .indexer import build_index
+    config = load()
+    if not config.repos:
+        click.echo("No repos configured. Run: textsessions init")
+        return
+    repos = config.repos
+    if repo_label:
+        repos = [r for r in repos if r.label == repo_label or r.label.startswith(repo_label + "/")]
+        if not repos:
+            click.echo(f"No repo matching '{repo_label}'", err=True)
+            sys.exit(1)
+    claude_dirs = detect_claude_dirs()
+    total = 0
+    for r in repos:
+        rk = repo_key(r.path)
+        pairs = [
+            f"{cd}::{cd / 'projects' / rk}"
+            for cd in claude_dirs
+            if (cd / "projects" / rk).exists()
+        ]
+        if not pairs:
+            click.echo(f"  [skip] {r.label}  (no .jsonl files found)")
+            continue
+        index = build_index(rk, pairs)
+        click.echo(f"  {r.label}  {len(index)} sessions")
+        total += len(index)
+    click.echo(f"Done. {total} sessions indexed across {len(repos)} repos.")
+
+
 
 # ---------------------------------------------------------------------------
 # Profile subcommand group
@@ -291,6 +325,17 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
             click.echo("Run: textsessions init", err=True)
             sys.exit(1)
         repo = best.label
+        # Auto-reindex so the list is always current
+        from .config import detect_claude_dirs
+        from .indexer import build_index
+        rk = repo_key(best.path)
+        pairs = [
+            f"{cd}::{cd / 'projects' / rk}"
+            for cd in detect_claude_dirs()
+            if (cd / "projects" / rk).exists()
+        ]
+        if pairs:
+            build_index(rk, pairs)
 
     all_sessions = load_sessions(config)
 
