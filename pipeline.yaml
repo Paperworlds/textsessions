@@ -1,0 +1,10 @@
+version: 1
+
+repos:
+  textsessions: .
+
+defaults:
+  model: sonnet
+  budget_usd: 2.00
+
+total_budget_usd: 20.00
