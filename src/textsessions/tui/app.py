@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import subprocess
+import sys
+from datetime import datetime
 from pathlib import Path
 
 from textual.app import App, ComposeResult
@@ -27,6 +29,7 @@ from ..indexer import (
     do_rename,
     do_tag,
     do_untag,
+    find_session_created_after,
     load_index,
     resolve_session_id,
     save_index,
@@ -35,7 +38,7 @@ from ..indexer import (
 )
 from ..proxy import SessionStats, fmt_tokens, load_current_session
 from ..sessions import Session, delete_session_from_index, filter_sessions, load_sessions, sort_by_priority
-from .modals import ArchiveModal, PriorityModal, RenameModal, TagModal, _DeleteConfirmModal
+from .modals import ArchiveModal, NewSessionModal, NewSessionResult, PriorityModal, RenameModal, TagModal, _DeleteConfirmModal
 
 PRIORITY_COLORS = {"H0": "bold red", "1": "yellow", "2": "cyan", "3": "dim", "": ""}
 
@@ -153,6 +156,7 @@ class TextSessionsApp(App):
         Binding("d", "archive_session", "Archive"),
         Binding("D", "delete_session_direct", "Delete"),
         Binding("enter", "resume_session", "Resume", show=True),
+        Binding("n", "new_session", "New", show=True),
         Binding("/", "focus_filter", "Filter"),
         Binding("s", "toggle_sort", "Sort"),
         Binding("g", "toggle_ghosts", "Ghosts"),
@@ -375,7 +379,67 @@ class TextSessionsApp(App):
         # Suspend TUI, resume session, return to TUI on exit
         profile = s.profile
         resume_id = s.id
+        cmd = ["claude", "--resume", resume_id]
+        if profile != "default":
+            cmd = ["claude", "--my-profile", profile, "--resume", resume_id]
         with self.suspend():
-            binary = "claude" if profile == "default" else f"claude-{profile}"
-            cmd = [binary, "--resume", resume_id]
-            subprocess.run(cmd)
+            subprocess.run(cmd, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+
+    def action_new_session(self) -> None:
+        # Determine available profiles (deduplicated, from configured repos)
+        seen: dict[str, str] = {}  # profile -> first repo path
+        for repo in self._config.repos:
+            if repo.profile not in seen:
+                seen[repo.profile] = str(repo.path)
+        profiles = list(seen.keys()) or ["default"]
+
+        # Default to profile/repo of the currently selected session
+        s = self._current_session()
+        default_profile = s.profile if s else profiles[0]
+        default_repo_path = str(s.repo_path) if s else seen.get(default_profile, "")
+        if default_profile not in profiles:
+            default_profile = profiles[0]
+
+        def handle(result: NewSessionResult | None) -> None:
+            if result is None:
+                return
+            launch_time = datetime.utcnow()
+            # Snapshot existing session IDs for this repo before launch
+            from ..config import repo_key
+            rk = repo_key(Path(result.repo_path))
+            from ..indexer import load_index as _load_index
+            known_ids: set[str] = set(_load_index(rk).keys())
+
+            cmd = ["claude"]
+            if result.profile != "default":
+                cmd += ["--my-profile", result.profile]
+            if result.name:
+                cmd += ["--name", result.name]
+
+            with self.suspend():
+                subprocess.run(cmd, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+
+            self._apply_post_launch_metadata(result, launch_time, known_ids)
+
+        self.push_screen(
+            NewSessionModal(profiles, default_profile, default_repo_path),
+            handle,
+        )
+
+    def _apply_post_launch_metadata(
+        self,
+        result: NewSessionResult,
+        since: datetime,
+        known_ids: set[str],
+    ) -> None:
+        from ..config import repo_key
+        self._reload_sessions()
+        rk = repo_key(Path(result.repo_path))
+        sid = find_session_created_after(rk, since, known_ids)
+        if sid and result.priority:
+            index = load_index(rk)
+            if sid in index:
+                index = do_priority(index, sid, result.priority)
+                save_index(rk, index)
+        self._reload_sessions()
+        self._populate_table()

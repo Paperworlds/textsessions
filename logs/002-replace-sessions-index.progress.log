@@ -9,3 +9,5 @@
 [2026-04-08T14:01:11Z] STEP 5: Fix scan-ghosts --archive / dry-run / --delete requires --yes — PASS
 [2026-04-08T14:01:11Z] STEP 6: Fix ArchiveModal UX archive-first + _DeleteConfirmModal — PASS
 [2026-04-08T14:03:20Z] STEP 7: Create tests/test_indexer.py + update test_scan_ghosts.py — PASS (55 tests pass)
+[2026-04-08T14:03:53Z] STEP 8: Commit + push — PASS (704df0c)
+[2026-04-08T14:04:16Z] STEP 9: Final report + state written — DONE

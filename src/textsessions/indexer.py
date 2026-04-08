@@ -338,3 +338,28 @@ def delete_session(index: dict, sid: str) -> dict:
     """Remove a session from the index dict. Returns the (mutated) index."""
     index.pop(sid, None)
     return index
+
+
+def find_session_created_after(repo_key: str, since: datetime, known_ids: set[str]) -> str | None:
+    """Find the single new session added to repo_key's index after `since`.
+
+    known_ids: snapshot of session IDs that existed before launch.
+    Returns the session ID if exactly one new session is found, else None.
+    """
+    index = load_index(repo_key)
+    new_ids = []
+    for sid, entry in index.items():
+        if sid in known_ids:
+            continue
+        last_active_str = entry.get("last_active", "")
+        if not last_active_str:
+            continue
+        try:
+            last_active = datetime.strptime(last_active_str, "%Y-%m-%d %H:%M")
+        except ValueError:
+            continue
+        if last_active >= since.replace(second=0, microsecond=0):
+            new_ids.append(sid)
+    if len(new_ids) == 1:
+        return new_ids[0]
+    return None

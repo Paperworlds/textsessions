@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, Select, Static
+
+
+@dataclass
+class NewSessionResult:
+    name: str
+    priority: str
+    profile: str
+    repo_path: str  # path string of the selected repo
 
 
 class TagModal(ModalScreen[str | None]):
@@ -189,3 +199,60 @@ class _DeleteConfirmModal(ModalScreen[bool]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss(event.button.id == "delete")
+
+
+class NewSessionModal(ModalScreen[NewSessionResult | None]):
+    """Modal to launch a new Claude Code session with optional name and priority."""
+
+    BINDINGS = [
+        Binding("escape", "dismiss(None)", "Cancel"),
+    ]
+
+    PRIORITIES = [
+        ("(none)", ""),
+        ("H0 — critical", "H0"),
+        ("1 — high", "1"),
+        ("2 — medium", "2"),
+        ("3 — low", "3"),
+    ]
+
+    def __init__(self, profiles: list[str], default_profile: str, default_repo_path: str) -> None:
+        super().__init__()
+        self._profiles = profiles
+        self._default_profile = default_profile
+        self._default_repo_path = default_repo_path
+
+    def compose(self) -> ComposeResult:
+        profile_options = [(p, p) for p in self._profiles]
+        with Vertical(id="dialog"):
+            yield Label("[bold]New session[/bold]", id="title")
+            yield Label("Name (optional):")
+            yield Input(placeholder="e.g. refactor-auth", id="name-input")
+            yield Label("Priority:")
+            yield Select(self.PRIORITIES, id="priority-select", allow_blank=False, value="")
+            yield Label("Profile:")
+            yield Select(profile_options, id="profile-select", allow_blank=False,
+                         value=self._default_profile)
+            with Horizontal(id="buttons"):
+                yield Button("Launch", variant="primary", id="launch")
+                yield Button("Cancel", id="cancel")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "launch":
+            name = self.query_one("#name-input", Input).value.strip()
+            priority_val = self.query_one("#priority-select", Select).value
+            profile_val = self.query_one("#profile-select", Select).value
+            priority = str(priority_val) if priority_val and priority_val is not Select.BLANK else ""
+            profile = str(profile_val) if profile_val and profile_val is not Select.BLANK else self._default_profile
+            self.dismiss(NewSessionResult(
+                name=name,
+                priority=priority,
+                profile=profile,
+                repo_path=self._default_repo_path,
+            ))
+        else:
+            self.dismiss(None)
+
+    def on_input_submitted(self, _event: Input.Submitted) -> None:
+        # Enter in name field moves focus to launch button
+        self.query_one("#launch", Button).focus()
