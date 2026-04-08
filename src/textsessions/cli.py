@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -345,13 +346,15 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
             click.echo(f"No session matching '{resume_name}'", err=True)
             sys.exit(1)
         s = matched[0]
+        import subprocess
+        if os.environ.get("TMUX"):
+            subprocess.run(["tmux", "rename-window", s.name], check=False)
         from .profiles import build_launch_env
         env = build_launch_env(s.profile, {"cloak": config.integrations.cloak, "aiproxy": config.integrations.aiproxy})
         if s.profile and s.profile != "default" and "CLAUDE_CONFIG_DIR" not in env:
             cmd = ["fish", "-c", f"claude-{s.profile} --resume {s.id}"]
         else:
             cmd = ["claude", "--resume", s.id]
-        import subprocess
         sys.exit(subprocess.run(cmd, env=env).returncode)
 
     filtered = filter_sessions(all_sessions, query=query, tag=tag, profile=profile, repo_label=repo)
