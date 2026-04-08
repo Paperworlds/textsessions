@@ -350,7 +350,7 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
         if os.environ.get("TMUX"):
             window_name = s.name or s.id[:8]
             subprocess.run(["tmux", "rename-window", window_name], check=False)
-            subprocess.run(["tmux", "set-option", "automatic-rename", "off"], check=False)
+            subprocess.run(["tmux", "set-option", "-w", "automatic-rename", "off"], check=False)
         from .profiles import build_launch_env
         env = build_launch_env(s.profile, {"cloak": config.integrations.cloak, "aiproxy": config.integrations.aiproxy})
         if s.profile and s.profile != "default" and "CLAUDE_CONFIG_DIR" not in env:
