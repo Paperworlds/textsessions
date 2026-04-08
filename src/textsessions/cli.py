@@ -277,8 +277,9 @@ def proxy() -> None:
 @click.option("--delete", "do_delete", is_flag=True, help="Hard-remove sessions from YAML index (irreversible). Requires --yes.")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation when --delete")
 @click.option("--keep", "keep_prefix", default="", help="Tag a hex-named session as 'keep' to exclude from future orphan detection. Requires --repo.")
+@click.option("--keep-all", "do_keep_all", is_flag=True, help="Tag ALL detected orphans in a repo as 'keep'. Requires --repo.")
 @click.option("--discard", "do_discard", is_flag=True, help="Archive all detected orphans/ghosts in one shot (no confirmation required).")
-def scan_ghosts(repo_label: str, as_json: bool, do_archive: bool, do_delete: bool, yes: bool, keep_prefix: str, do_discard: bool) -> None:
+def scan_ghosts(repo_label: str, as_json: bool, do_archive: bool, do_delete: bool, yes: bool, keep_prefix: str, do_keep_all: bool, do_discard: bool) -> None:
     """Scan for ghost (dead repo) and orphan (throwaway) sessions.
 
     \b
@@ -287,6 +288,7 @@ def scan_ghosts(repo_label: str, as_json: bool, do_archive: bool, do_delete: boo
     Default (no flags): dry-run report, no mutations.
     --keep      Tag a hex-named session as 'keep' to exclude it permanently.
                 Requires --repo.
+    --keep-all  Tag ALL detected orphans in the repo as 'keep'. Requires --repo.
     --archive   Recommended: tag sessions as 'archived' so they disappear
                 from normal view but remain recoverable.
     --discard   Archive all detected orphans/ghosts without a dry-run prompt.
@@ -322,6 +324,34 @@ def scan_ghosts(repo_label: str, as_json: bool, do_archive: bool, do_delete: boo
         write_legacy_tsv(rkey, index)
         console = Console()
         console.print(f"Kept: {s.short_id}  {s.slug[:40]!r}")
+        return
+
+    # --keep-all: tag every detected orphan in the repo as 'keep'
+    if do_keep_all:
+        if not repo_label:
+            click.echo("--repo is required when using --keep-all", err=True)
+            sys.exit(1)
+        from .indexer import do_tag, load_index, save_index, write_legacy_tsv
+        from .config import repo_key as _repo_key
+        orphans_to_keep = [s for s in all_sessions if not s.is_ghost and s.is_orphan]
+        if not orphans_to_keep:
+            click.echo(f"No orphans found in {repo_label}.")
+            return
+        by_path: dict[str, list] = {}
+        for s in orphans_to_keep:
+            by_path.setdefault(str(s.repo_path), []).append(s)
+        kept = 0
+        for repo_path_str, sessions in by_path.items():
+            from pathlib import Path as _Path
+            rkey = _repo_key(_Path(repo_path_str))
+            index = load_index(rkey)
+            for s in sessions:
+                index = do_tag(index, s.id, "keep")
+                kept += 1
+            save_index(rkey, index)
+            write_legacy_tsv(rkey, index)
+        console = Console()
+        console.print(f"[green]Kept {kept} orphans in {repo_label}.[/green]")
         return
 
     ghosts = [s for s in all_sessions if s.is_ghost]
