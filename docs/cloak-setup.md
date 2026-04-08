@@ -59,6 +59,36 @@ Repeat for any additional profiles.
 
 ---
 
+## Step 3b — Create worker profiles
+
+For each account, create a corresponding `<account>-worker` profile. Worker
+profiles share the same credentials but start with **zero memory** — no
+`CLAUDE.md`, no auto-loaded context. They are used by headless tools like
+`pp` (paperagents), CI runs, and any other automation that should not
+accumulate personal memory or be influenced by interactive session history.
+
+With your **work** account active:
+
+```sh
+cloak create work-worker
+# then wipe memory — same creds, clean slate:
+rm -f ~/.cloak/profiles/work-worker/CLAUDE.md
+```
+
+With your **personal** account active:
+
+```sh
+cloak create personal-worker
+rm -f ~/.cloak/profiles/personal-worker/CLAUDE.md
+```
+
+> `pp` runs use `--bare` by default (disables auto-memory at the Claude level
+> too), but having an isolated worker profile adds a second layer of isolation
+> and lets other tools (not just pp) opt into a clean environment without
+> touching your real profile.
+
+---
+
 ## Step 4 — Verify
 
 ```sh
