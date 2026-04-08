@@ -300,5 +300,5 @@ class TextSessionsApp(App):
         profile = s.profile
         resume_id = s.id
         with self.suspend():
-            cmd = ["claude", f"--my-profile", profile, "--resume", resume_id]
+            cmd = [self._config.claude_cmd, "--my-profile", profile, "--resume", resume_id]
             subprocess.run(cmd)
