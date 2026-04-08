@@ -5,9 +5,9 @@ default:
 test:
     uv run pytest -x -q
 
-# Install in editable mode
+# Install as editable uv tool (no venv required)
 install:
-    uv pip install -e .
+    uv tool install -e . --force
 
 # Build distribution
 build:
