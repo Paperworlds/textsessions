@@ -180,7 +180,7 @@ class TextSessionsApp(App):
         Binding("r", "rename_session", "Rename"),
         Binding("d", "archive_session", "Archive"),
         Binding("D", "delete_session_direct", "Delete"),
-        Binding("enter", "resume_session", "Resume", show=True),
+
         Binding("n", "new_session", "New", show=True),
         Binding("/", "focus_filter", "Filter"),
         Binding("s", "toggle_sort", "Sort"),
@@ -271,6 +271,9 @@ class TextSessionsApp(App):
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         self._update_detail(event.cursor_row)
+
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        self.action_resume_session()
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "filter-input":
