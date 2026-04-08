@@ -416,8 +416,6 @@ class TextSessionsApp(App):
         profile = s.profile
         resume_id = s.id
         cmd = ["claude", "--resume", resume_id]
-        if profile != "default":
-            cmd = ["claude", "--my-profile", profile, "--resume", resume_id]
         env = build_launch_env(profile, {
             "cloak": self._config.integrations.cloak,
             "aiproxy": self._config.integrations.aiproxy,
@@ -451,8 +449,6 @@ class TextSessionsApp(App):
             known_ids: set[str] = set(_load_index(rk).keys())
 
             cmd = ["claude"]
-            if result.profile != "default":
-                cmd += ["--my-profile", result.profile]
             if result.name:
                 cmd += ["--name", result.name]
             env = build_launch_env(result.profile, {
