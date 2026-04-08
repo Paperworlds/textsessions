@@ -6,10 +6,12 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+import json as _json
+
 from . import __version__
-from .config import CONFIG_PATH, load, run_init, save
+from .config import CONFIG_PATH, load, repo_key, run_init, save
 from .proxy import fmt_tokens, load_all_time, load_current_session
-from .sessions import filter_sessions, load_sessions, sort_by_priority
+from .sessions import delete_session_from_index, filter_sessions, load_sessions, sort_by_priority
 
 
 @click.group(invoke_without_command=True)
@@ -108,6 +110,88 @@ def proxy() -> None:
             console.print(f"  [dim]{model}[/dim]  {fmt_tokens(stats['input'])} in / {fmt_tokens(stats['output'])} out  ({stats['requests']} req)")
 
     console.print()
+
+
+@main.command("scan-ghosts")
+@click.option("--repo", "-r", "repo_label", default="", help="Limit to one repo label")
+@click.option("--min-words", default=8, show_default=True, help="Orphan slug word threshold")
+@click.option("--json", "as_json", is_flag=True, help="Machine-readable output")
+@click.option("--delete", "do_delete", is_flag=True, help="Actually remove ghost/orphan sessions")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation when --delete")
+def scan_ghosts(repo_label: str, min_words: int, as_json: bool, do_delete: bool, yes: bool) -> None:
+    """Scan for ghost (dead repo) and orphan (throwaway) sessions."""
+    config = load()
+    if not config.repos:
+        click.echo("No repos configured. Run: textsessions init")
+        return
+
+    all_sessions = load_sessions(config, show_archived=True)
+    if repo_label:
+        all_sessions = [s for s in all_sessions if s.repo_label == repo_label or s.repo_label.startswith(repo_label + "/")]
+
+    # Override orphan threshold if custom
+    from .sessions import Session as _Session
+
+    def _is_orphan_custom(s: _Session) -> bool:
+        if s.tags or s.priority:
+            return False
+        if len(s.name) > 8 or " " in s.name:
+            return False
+        return len(s.slug.split()) <= min_words
+
+    ghosts = [s for s in all_sessions if s.is_ghost]
+    orphans = [s for s in all_sessions if not s.is_ghost and _is_orphan_custom(s)]
+    flagged = ghosts + orphans
+
+    if as_json:
+        out = [
+            {
+                "id": s.id,
+                "name": s.name,
+                "repo": s.repo_label,
+                "kind": "ghost" if s.is_ghost else "orphan",
+                "last_active": s.last_active,
+                "slug": s.slug,
+            }
+            for s in flagged
+        ]
+        click.echo(_json.dumps(out, indent=2))
+        return
+
+    console = Console()
+    from itertools import groupby
+    from operator import attrgetter
+
+    by_repo = {}
+    for s in flagged:
+        by_repo.setdefault(s.repo_label, []).append(s)
+
+    total_ghosts = len(ghosts)
+    total_orphans = len(orphans)
+
+    for label, sessions in sorted(by_repo.items()):
+        r_ghosts = sum(1 for s in sessions if s.is_ghost)
+        r_orphans = sum(1 for s in sessions if not s.is_ghost)
+        console.print(f"\n[bold]{label}[/bold]  [dim]({r_ghosts} ghosts, {r_orphans} orphans)[/dim]")
+        for s in sessions[:20]:
+            kind = "[red]ghost [/red]" if s.is_ghost else "[yellow]orphan[/yellow]"
+            console.print(f"  [{kind}]  [dim]{s.id[:8]}[/dim]  {s.last_active}  {s.slug[:60]!r}")
+        if len(sessions) > 20:
+            console.print(f"  [dim]... {len(sessions) - 20} more[/dim]")
+
+    console.print(f"\n[bold]Total:[/bold] {total_ghosts} ghosts, {total_orphans} orphans across {len(by_repo)} repos\n")
+
+    if not flagged:
+        return
+
+    if do_delete:
+        if not yes:
+            click.confirm(f"Delete {len(flagged)} sessions?", abort=True)
+        deleted = 0
+        for s in flagged:
+            if delete_session_from_index(s.repo_path, s.id):
+                deleted += 1
+        console.print(f"[green]Deleted {deleted} sessions.[/green]")
 
 
 @main.command()

@@ -23,8 +23,8 @@ from textual.widgets import (
 
 from ..config import Config, load, repo_key
 from ..proxy import SessionStats, fmt_tokens, load_current_session
-from ..sessions import Session, filter_sessions, load_sessions, sort_by_priority
-from .modals import PriorityModal, RenameModal, TagModal
+from ..sessions import Session, delete_session_from_index, filter_sessions, load_sessions, sort_by_priority
+from .modals import ArchiveModal, PriorityModal, RenameModal, TagModal
 
 SESSIONS_INDEX = "claude-sessions-index"
 PRIORITY_COLORS = {"H0": "bold red", "1": "yellow", "2": "cyan", "3": "dim", "": ""}
@@ -140,14 +140,17 @@ class TextSessionsApp(App):
         Binding("t", "tag_session", "Tag"),
         Binding("p", "priority_session", "Priority"),
         Binding("r", "rename_session", "Rename"),
+        Binding("d", "archive_session", "Archive/Delete"),
         Binding("enter", "resume_session", "Resume", show=True),
         Binding("/", "focus_filter", "Filter"),
         Binding("s", "toggle_sort", "Sort"),
+        Binding("g", "toggle_ghosts", "Ghosts"),
         Binding("escape", "clear_filter", "Clear filter"),
         Binding("q", "quit", "Quit"),
     ]
 
     _sort_by_priority: reactive[bool] = reactive(False)
+    _ghosts_only: reactive[bool] = reactive(False)
     _filter_query: reactive[str] = reactive("")
     _sessions: list[Session] = []
     _filtered: list[Session] = []
@@ -179,7 +182,7 @@ class TextSessionsApp(App):
 
     def _apply_filter(self) -> None:
         q = self._filter_query
-        self._filtered = filter_sessions(self._sessions, query=q)
+        self._filtered = filter_sessions(self._sessions, query=q, ghosts_only=self._ghosts_only)
         if self._sort_by_priority:
             self._filtered = sort_by_priority(self._filtered)
 
@@ -189,11 +192,17 @@ class TextSessionsApp(App):
         table.add_columns("Name", "Repo", "Profile", "Tags", "Pri", "Last Active")
         for s in self._filtered:
             pri = s.display_priority
+            if s.is_ghost:
+                name_cell = f"[dim]~{s.name}[/dim]"
+            elif s.is_orphan:
+                name_cell = f"[dim]{s.name}[/dim]"
+            else:
+                name_cell = s.name
             table.add_row(
-                s.name,
+                name_cell,
                 s.repo_label,
                 s.profile,
-                " ".join(f"#{t}" for t in s.tags),
+                " ".join(f"#{t}" for t in s.tags if t != "archived"),
                 pri,
                 s.last_active,
                 key=s.id,
@@ -231,6 +240,11 @@ class TextSessionsApp(App):
 
     def action_toggle_sort(self) -> None:
         self._sort_by_priority = not self._sort_by_priority
+        self._apply_filter()
+        self._populate_table()
+
+    def action_toggle_ghosts(self) -> None:
+        self._ghosts_only = not self._ghosts_only
         self._apply_filter()
         self._populate_table()
 
@@ -291,6 +305,24 @@ class TextSessionsApp(App):
             self._populate_table()
 
         self.push_screen(RenameModal(s.name, s.slug), handle)
+
+    def action_archive_session(self) -> None:
+        s = self._current_session()
+        if not s:
+            return
+
+        def handle(result: str | None) -> None:
+            if result == "hide":
+                key = repo_key(s.repo_path)
+                subprocess.run([SESSIONS_INDEX, "tag", key, s.id, "archived"], capture_output=True)
+                self._reload_sessions()
+                self._populate_table()
+            elif result == "delete":
+                delete_session_from_index(s.repo_path, s.id)
+                self._reload_sessions()
+                self._populate_table()
+
+        self.push_screen(ArchiveModal(s.name, s.is_ghost, s.is_orphan), handle)
 
     def action_resume_session(self) -> None:
         s = self._current_session()

@@ -110,3 +110,44 @@ class RenameModal(ModalScreen[str | None]):
     def on_input_submitted(self, event: Input.Submitted) -> None:
         val = event.value.strip()
         self.dismiss(val if val else None)
+
+
+class ArchiveModal(ModalScreen[str | None]):
+    """Modal to hide or delete a session."""
+
+    BINDINGS = [
+        Binding("escape", "dismiss(None)", "Cancel"),
+    ]
+
+    def __init__(self, session_name: str, is_ghost: bool, is_orphan: bool) -> None:
+        super().__init__()
+        self._session_name = session_name
+        self._is_ghost = is_ghost
+        self._is_orphan = is_orphan
+
+    def compose(self) -> ComposeResult:
+        flags = []
+        if self._is_ghost:
+            flags.append("[red]ghost[/red]")
+        if self._is_orphan:
+            flags.append("[yellow]orphan[/yellow]")
+        flag_str = "  " + "  ".join(flags) if flags else ""
+        with Vertical(id="dialog"):
+            yield Label(f"[bold]Archive / Delete[/bold] — {self._session_name}{flag_str}", id="title")
+            yield Static(
+                "[dim]Hide[/dim] keeps the session in the index but filters it out.\n"
+                "[dim]Delete[/dim] removes it permanently from the YAML index.",
+                id="current",
+            )
+            with Horizontal(id="buttons"):
+                yield Button("Hide", variant="warning", id="hide")
+                yield Button("Delete", variant="error", id="delete")
+                yield Button("Cancel", id="cancel")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "hide":
+            self.dismiss("hide")
+        elif event.button.id == "delete":
+            self.dismiss("delete")
+        else:
+            self.dismiss(None)
