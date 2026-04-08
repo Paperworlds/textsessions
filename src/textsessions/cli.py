@@ -6,12 +6,14 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from . import __version__
 from .config import CONFIG_PATH, load, run_init, save
 from .proxy import fmt_tokens, load_all_time, load_current_session
 from .sessions import filter_sessions, load_sessions, sort_by_priority
 
 
 @click.group(invoke_without_command=True)
+@click.version_option(__version__, "--version", "-V")
 @click.pass_context
 def main(ctx: click.Context) -> None:
     """textsessions — TUI for Claude Code session management."""
