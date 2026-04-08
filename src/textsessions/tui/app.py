@@ -23,7 +23,7 @@ from textual.widgets import (
     TabPane,
 )
 
-from ..config import Config, load, repo_key
+from ..config import Config, RepoConfig, load, repo_key
 from ..profiles import build_launch_env, cloak_available
 from ..indexer import (
     do_priority,
@@ -42,6 +42,23 @@ from ..sessions import Session, delete_session_from_index, filter_sessions, load
 from .modals import ArchiveModal, NewSessionModal, NewSessionResult, PriorityModal, RenameModal, TagModal, _DeleteConfirmModal
 
 PRIORITY_COLORS = {"H0": "bold red", "1": "yellow", "2": "cyan", "3": "dim", "": ""}
+
+
+def _repo_for_cwd(config: Config) -> RepoConfig | None:
+    """Return the closest configured repo that is a parent of (or equal to) cwd."""
+    cwd = Path.cwd()
+    best: RepoConfig | None = None
+    best_len = -1
+    for repo in config.repos:
+        try:
+            cwd.relative_to(repo.path)
+        except ValueError:
+            continue
+        parts = len(repo.path.parts)
+        if parts > best_len:
+            best_len = parts
+            best = repo
+    return best
 
 
 class SessionDetail(Static):
@@ -195,6 +212,13 @@ class TextSessionsApp(App):
 
     def on_mount(self) -> None:
         self._reload_sessions()
+        if self._config.ui.startup_repo == "current":
+            matched = _repo_for_cwd(self._config)
+            if matched:
+                self._filter_query = matched.label
+                inp = self.query_one("#filter-input", Input)
+                inp.value = matched.label
+                self._apply_filter()
         self._populate_table()
         self.set_interval(5, self._refresh_proxy)
         self._refresh_proxy()

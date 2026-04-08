@@ -41,10 +41,16 @@ class IntegrationsConfig:
 
 
 @dataclass
+class UiConfig:
+    startup_repo: str = "all"  # "current" | "all"
+
+
+@dataclass
 class Config:
     repos: list[RepoConfig] = field(default_factory=list)
     proxy: ProxyConfig = field(default_factory=ProxyConfig)
     integrations: IntegrationsConfig = field(default_factory=IntegrationsConfig)
+    ui: UiConfig = field(default_factory=UiConfig)
 
 
 def load() -> Config:
@@ -71,7 +77,11 @@ def load() -> Config:
         cloak=integrations_data.get("cloak", True),
         aiproxy=integrations_data.get("aiproxy", True),
     )
-    return Config(repos=repos, proxy=proxy, integrations=integrations)
+    ui_data = data.get("ui", {})
+    ui = UiConfig(
+        startup_repo=ui_data.get("startup_repo", "all"),
+    )
+    return Config(repos=repos, proxy=proxy, integrations=integrations, ui=ui)
 
 
 def save(config: Config) -> None:
@@ -93,6 +103,9 @@ def save(config: Config) -> None:
         "integrations": {
             "cloak": config.integrations.cloak,
             "aiproxy": config.integrations.aiproxy,
+        },
+        "ui": {
+            "startup_repo": config.ui.startup_repo,
         },
     }
     with open(CONFIG_PATH, "wb") as f:
