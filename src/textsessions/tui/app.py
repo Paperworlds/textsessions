@@ -415,11 +415,16 @@ class TextSessionsApp(App):
         # Suspend TUI, resume session, return to TUI on exit
         profile = s.profile
         resume_id = s.id
-        cmd = ["claude", "--resume", resume_id]
         env = build_launch_env(profile, {
             "cloak": self._config.integrations.cloak,
             "aiproxy": self._config.integrations.aiproxy,
         })
+        # If cloak isn't installed and profile is non-default, fall back to
+        # claude-<profile> binary (e.g. claude-work) which the user may have on PATH.
+        if profile and profile != "default" and "CLAUDE_CONFIG_DIR" not in env:
+            cmd = [f"claude-{profile}", "--resume", resume_id]
+        else:
+            cmd = ["claude", "--resume", resume_id]
         with self.suspend():
             subprocess.run(cmd, env=env, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
 
