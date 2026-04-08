@@ -419,10 +419,10 @@ class TextSessionsApp(App):
             "cloak": self._config.integrations.cloak,
             "aiproxy": self._config.integrations.aiproxy,
         })
-        # If cloak isn't installed and profile is non-default, fall back to
-        # claude-<profile> binary (e.g. claude-work) which the user may have on PATH.
+        # If cloak isn't installed and profile is non-default, invoke via fish
+        # so that fish functions like claude-work are available.
         if profile and profile != "default" and "CLAUDE_CONFIG_DIR" not in env:
-            cmd = [f"claude-{profile}", "--resume", resume_id]
+            cmd = ["fish", "-c", f"claude-{profile} --resume {resume_id}"]
         else:
             cmd = ["claude", "--resume", resume_id]
         with self.suspend():
