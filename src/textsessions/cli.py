@@ -264,7 +264,9 @@ def _complete_session_names(ctx: click.Context, param: click.Parameter, incomple
 @click.option("--resume", "resume_name", default="", metavar="NAME",
               shell_complete=_complete_session_names,
               help="Resume a session by name or ID prefix.")
-def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, by_priority: bool, limit: int, resume_name: str) -> None:
+@click.option("--names-only", "names_only", is_flag=True, hidden=True,
+              help="Print session names one per line (for shell completion).")
+def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, by_priority: bool, limit: int, resume_name: str, names_only: bool) -> None:
     """Print session table (non-TUI, for scripting)."""
     config = load()
     if not config.repos:
@@ -311,6 +313,11 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
     if by_priority:
         filtered = sort_by_priority(filtered)
     filtered = filtered[:limit]
+
+    if names_only:
+        for s in filtered:
+            click.echo(s.name)
+        return
 
     console = Console()
     table = Table(show_header=True, header_style="bold")
