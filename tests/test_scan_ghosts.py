@@ -175,3 +175,66 @@ def test_scan_ghosts_delete_requires_yes(fake_env):
     assert result.exit_code != 0 or "Deleted" not in result.output
     # Index should be unchanged
     assert (state_dir / f"{real_key}.yaml").read_text() == before
+
+
+def test_keep_tag_excludes_orphan():
+    """A hex-named session tagged 'keep' must not be classified as an orphan."""
+    from pathlib import Path
+
+    from textsessions.sessions import Session
+
+    s = Session(
+        id="ac4b71c7" + "a" * 24,
+        name="ac4b7",  # 5-char hex name — would normally be an orphan
+        profile="personal",
+        last_active="2026-04-08 10:00",
+        slug="some real work",
+        tags=["keep"],
+        repo_path=Path("/nonexistent"),
+        repo_label="test",
+    )
+    assert not s.is_orphan
+
+
+def test_scan_ghosts_keep(fake_env):
+    """--keep <prefix> should tag the matching session with 'keep' and print confirmation."""
+    config, state_dir, real_repo, ghost_repo, real_key, ghost_key = fake_env
+
+    runner = CliRunner()
+    with patch("textsessions.cli.load", return_value=config), \
+         patch("textsessions.sessions.STATE_DIR", state_dir), \
+         patch("textsessions.indexer.STATE_DIR", state_dir), \
+         patch("textsessions.indexer.LEGACY_INDEX_DIR", state_dir / "legacy"):
+        # a*32 session has ID starting with 'aaa...' — use short prefix
+        result = runner.invoke(main, ["scan-ghosts", "--repo", "real", "--keep", "aaa"])
+
+    assert result.exit_code == 0, result.output
+    assert "Kept:" in result.output
+
+    real_index = yaml.safe_load((state_dir / f"{real_key}.yaml").read_text()) or {}
+    assert "keep" in real_index["a" * 32].get("tags", [])
+
+
+def test_scan_ghosts_discard(fake_env):
+    """--discard should archive all detected orphans/ghosts without prompting."""
+    config, state_dir, real_repo, ghost_repo, real_key, ghost_key = fake_env
+
+    runner = CliRunner()
+    with patch("textsessions.cli.load", return_value=config), \
+         patch("textsessions.sessions.STATE_DIR", state_dir), \
+         patch("textsessions.indexer.STATE_DIR", state_dir), \
+         patch("textsessions.indexer.LEGACY_INDEX_DIR", state_dir / "legacy"):
+        result = runner.invoke(main, ["scan-ghosts", "--discard"])
+
+    assert result.exit_code == 0, result.output
+    assert "Archived" in result.output
+
+    # Orphan (a*32) should be archived in real repo
+    real_index = yaml.safe_load((state_dir / f"{real_key}.yaml").read_text()) or {}
+    assert "archived" in real_index["a" * 32].get("tags", [])
+    # Tagged/priority session should be untouched
+    assert "archived" not in real_index["b" * 32].get("tags", [])
+
+    # Ghost repo session should be archived
+    ghost_index = yaml.safe_load((state_dir / f"{ghost_key}.yaml").read_text()) or {}
+    assert "archived" in ghost_index["c" * 32].get("tags", [])

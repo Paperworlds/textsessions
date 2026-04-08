@@ -50,7 +50,11 @@ class Session:
 
     @property
     def is_orphan(self) -> bool:
-        """Throwaway session: Claude auto-named with a 5-8 char hex hash, no metadata."""
+        """Throwaway session: Claude auto-named with a 5-8 char hex hash, no metadata.
+
+        Tagging a session 'keep' sets self.tags, which makes this return False —
+        use `scan-ghosts --keep <prefix>` to permanently exclude a hex-named session.
+        """
         if self.tags or self.priority:
             return False
         return bool(_HEX_NAME_RE.match(self.name))

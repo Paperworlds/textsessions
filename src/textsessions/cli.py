@@ -276,15 +276,20 @@ def proxy() -> None:
 @click.option("--archive", "do_archive", is_flag=True, help="Recommended: tag ghosts/orphans as 'archived' (reversible)")
 @click.option("--delete", "do_delete", is_flag=True, help="Hard-remove sessions from YAML index (irreversible). Requires --yes.")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation when --delete")
-def scan_ghosts(repo_label: str, as_json: bool, do_archive: bool, do_delete: bool, yes: bool) -> None:
+@click.option("--keep", "keep_prefix", default="", help="Tag a hex-named session as 'keep' to exclude from future orphan detection. Requires --repo.")
+@click.option("--discard", "do_discard", is_flag=True, help="Archive all detected orphans/ghosts in one shot (no confirmation required).")
+def scan_ghosts(repo_label: str, as_json: bool, do_archive: bool, do_delete: bool, yes: bool, keep_prefix: str, do_discard: bool) -> None:
     """Scan for ghost (dead repo) and orphan (throwaway) sessions.
 
     \b
     Orphans are sessions auto-named by Claude with a 5-8 char hex hash and
     no tags or priority set.
     Default (no flags): dry-run report, no mutations.
+    --keep      Tag a hex-named session as 'keep' to exclude it permanently.
+                Requires --repo.
     --archive   Recommended: tag sessions as 'archived' so they disappear
                 from normal view but remain recoverable.
+    --discard   Archive all detected orphans/ghosts without a dry-run prompt.
     --delete    Permanent hard removal. Requires --yes. Use with care.
     """
     config = load()
@@ -295,6 +300,29 @@ def scan_ghosts(repo_label: str, as_json: bool, do_archive: bool, do_delete: boo
     all_sessions = load_sessions(config, show_archived=True)
     if repo_label:
         all_sessions = [s for s in all_sessions if s.repo_label == repo_label or s.repo_label.startswith(repo_label + "/")]
+
+    # --keep: tag one session as 'keep' to permanently exclude from orphan detection
+    if keep_prefix:
+        if not repo_label:
+            click.echo("--repo is required when using --keep", err=True)
+            sys.exit(1)
+        from .indexer import do_tag, load_index, save_index, write_legacy_tsv
+        from .config import repo_key as _repo_key
+        matched = [s for s in all_sessions if s.id.startswith(keep_prefix)]
+        if not matched:
+            matched = [s for s in all_sessions if s.name.startswith(keep_prefix)]
+        if not matched:
+            click.echo(f"No session matching '{keep_prefix}'", err=True)
+            sys.exit(1)
+        s = matched[0]
+        rkey = _repo_key(s.repo_path)
+        index = load_index(rkey)
+        index = do_tag(index, s.id, "keep")
+        save_index(rkey, index)
+        write_legacy_tsv(rkey, index)
+        console = Console()
+        console.print(f"Kept: {s.short_id}  {s.slug[:40]!r}")
+        return
 
     ghosts = [s for s in all_sessions if s.is_ghost]
     orphans = [s for s in all_sessions if not s.is_ghost and s.is_orphan]
@@ -339,7 +367,7 @@ def scan_ghosts(repo_label: str, as_json: bool, do_archive: bool, do_delete: boo
     if not flagged:
         return
 
-    if not do_archive and not do_delete:
+    if not do_archive and not do_delete and not do_discard:
         console.print("[dim]Dry run — use --archive (recommended) or --delete --yes to act.[/dim]")
         return
 
@@ -357,7 +385,7 @@ def scan_ghosts(repo_label: str, as_json: bool, do_archive: bool, do_delete: boo
         console.print(f"[green]Deleted {deleted} sessions.[/green]")
         return
 
-    if do_archive:
+    if do_archive or do_discard:
         from .indexer import do_tag, load_index, save_index, write_legacy_tsv
         from .config import repo_key as _repo_key
         archived = 0
@@ -375,7 +403,10 @@ def scan_ghosts(repo_label: str, as_json: bool, do_archive: bool, do_delete: boo
                     archived += 1
             save_index(rkey, index)
             write_legacy_tsv(rkey, index)
-        console.print(f"[green]Archived {archived} sessions.[/green]")
+        if do_discard and repo_label:
+            console.print(f"[green]Archived {archived} orphans in {repo_label}.[/green]")
+        else:
+            console.print(f"[green]Archived {archived} sessions.[/green]")
 
 
 @main.command()
