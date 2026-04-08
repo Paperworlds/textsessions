@@ -240,6 +240,19 @@ def profile_check() -> None:
         console.print("\n[yellow]Some profiles need setup.[/yellow]")
 
 
+def _complete_session_names(ctx: click.Context, param: click.Parameter, incomplete: str) -> list[click.shell_completion.CompletionItem]:
+    try:
+        config = load()
+        sessions = load_sessions(config)
+        return [
+            click.shell_completion.CompletionItem(s.name, help=s.repo_label)
+            for s in sessions
+            if incomplete.lower() in s.name.lower()
+        ]
+    except Exception:
+        return []
+
+
 @main.command("sessions")
 @click.option("--filter", "-f", "query", default="", help="Filter by name/slug")
 @click.option("--tag", "-t", default="", help="Filter by tag")
@@ -248,7 +261,10 @@ def profile_check() -> None:
 @click.option("--current-folder", "use_cwd", is_flag=True, help="Filter to the repo matching the current directory")
 @click.option("--priority", "by_priority", is_flag=True, help="Sort by priority")
 @click.option("--limit", "-l", default=20, show_default=True, help="Max sessions to show")
-def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, by_priority: bool, limit: int) -> None:
+@click.option("--resume", "resume_name", default="", metavar="NAME",
+              shell_complete=_complete_session_names,
+              help="Resume a session by name or ID prefix.")
+def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, by_priority: bool, limit: int, resume_name: str) -> None:
     """Print session table (non-TUI, for scripting)."""
     config = load()
     if not config.repos:
@@ -275,6 +291,22 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
         repo = best.label
 
     all_sessions = load_sessions(config)
+
+    if resume_name:
+        matched = [s for s in all_sessions if s.name == resume_name or s.id.startswith(resume_name) or s.name.startswith(resume_name)]
+        if not matched:
+            click.echo(f"No session matching '{resume_name}'", err=True)
+            sys.exit(1)
+        s = matched[0]
+        from .profiles import build_launch_env
+        env = build_launch_env(s.profile, {"cloak": config.integrations.cloak, "aiproxy": config.integrations.aiproxy})
+        if s.profile and s.profile != "default" and "CLAUDE_CONFIG_DIR" not in env:
+            cmd = ["fish", "-c", f"claude-{s.profile} --resume {s.id}"]
+        else:
+            cmd = ["claude", "--resume", s.id]
+        import subprocess
+        sys.exit(subprocess.run(cmd, env=env).returncode)
+
     filtered = filter_sessions(all_sessions, query=query, tag=tag, profile=profile, repo_label=repo)
     if by_priority:
         filtered = sort_by_priority(filtered)

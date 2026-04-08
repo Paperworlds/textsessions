@@ -35,3 +35,4 @@ complete -c textsessions -n "__fish_seen_subcommand_from sessions" -l tag      -
 complete -c textsessions -n "__fish_seen_subcommand_from sessions" -l profile  -d "Filter by profile" -xa "default work personal"
 complete -c textsessions -n "__fish_seen_subcommand_from sessions" -l priority -d "Sort by priority"
 complete -c textsessions -n "__fish_seen_subcommand_from sessions" -l limit    -d "Max results" -r
+complete -c textsessions -n "__fish_seen_subcommand_from sessions" -l resume   -d "Resume session by name" -xa "(textsessions sessions --limit 200 2>/dev/null | awk 'NR>2 && /^\s*[^ ]/ {print $1}')"
