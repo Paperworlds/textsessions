@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 import click
 from rich.console import Console
@@ -11,7 +12,7 @@ from rich.table import Table
 import json as _json
 
 from . import __version__
-from .config import CONFIG_PATH, load, repo_key, run_init, save
+from .config import CONFIG_PATH, RepoConfig, load, repo_key, run_init, save
 from .proxy import fmt_tokens, load_all_time, load_current_session
 from .sessions import delete_session_from_index, filter_sessions, load_sessions, sort_by_priority
 
@@ -206,14 +207,34 @@ def profile_check() -> None:
 @click.option("--tag", "-t", default="", help="Filter by tag")
 @click.option("--profile", "-p", default="", help="Filter by profile")
 @click.option("--repo", "-r", default="", help="Filter by repo label")
+@click.option("--current-folder", "use_cwd", is_flag=True, help="Filter to the repo matching the current directory")
 @click.option("--priority", "by_priority", is_flag=True, help="Sort by priority")
 @click.option("--limit", "-l", default=20, show_default=True, help="Max sessions to show")
-def sessions_cmd(query: str, tag: str, profile: str, repo: str, by_priority: bool, limit: int) -> None:
+def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, by_priority: bool, limit: int) -> None:
     """Print session table (non-TUI, for scripting)."""
     config = load()
     if not config.repos:
         click.echo("No repos configured. Run: textsessions init")
         return
+
+    if use_cwd:
+        cwd = Path.cwd()
+        best: RepoConfig | None = None
+        best_len = -1
+        for r in config.repos:
+            try:
+                cwd.relative_to(r.path)
+            except ValueError:
+                continue
+            parts = len(r.path.parts)
+            if parts > best_len:
+                best_len = parts
+                best = r
+        if best is None:
+            click.echo(f"No configured repo matches current directory ({cwd}).", err=True)
+            click.echo("Run: textsessions init", err=True)
+            sys.exit(1)
+        repo = best.label
 
     all_sessions = load_sessions(config)
     filtered = filter_sessions(all_sessions, query=query, tag=tag, profile=profile, repo_label=repo)
