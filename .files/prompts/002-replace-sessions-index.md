@@ -109,7 +109,27 @@ Where `sessions_index_compat` is a thin Click command that translates the
 old positional-arg style (`<cmd> <repo-key> [args]`) into the new subcommand
 style. This means the existing fish functions need zero changes.
 
-### 6. Archive-first UX (fix from prompt 001)
+### 6. Fix `scan-ghosts` archive behaviour (gap from prompt 001)
+
+`scan-ghosts` currently only supports `--delete` (hard remove). This
+contradicts the archive-first principle. Fix it:
+
+- Default action (no flags): dry-run report, no mutations.
+- `--archive` (new): tags each flagged session with `archived` via the
+  indexer's `do_tag` function. Sessions disappear from normal view but
+  are recoverable. This should be the recommended cleanup path.
+- `--delete`: hard remove from YAML, as before. Requires `--yes` or
+  interactive confirmation. Should warn that this is irreversible.
+
+Update the help text to make `--archive` the suggested action:
+
+```
+textsessions scan-ghosts            # dry-run, shows report
+textsessions scan-ghosts --archive  # recommended: hide ghosts/orphans
+textsessions scan-ghosts --delete --yes  # permanent, use with care
+```
+
+### 7. Archive-first UX (fix from prompt 001)
 
 The `ArchiveModal` added in prompt 001 must default to **archive (hide)**:
 - Pressing `Enter` or `Space` in the modal confirms archive, not delete.
