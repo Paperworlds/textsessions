@@ -113,10 +113,16 @@ class RenameModal(ModalScreen[str | None]):
 
 
 class ArchiveModal(ModalScreen[str | None]):
-    """Modal to hide or delete a session."""
+    """Modal to archive (soft) or delete (hard) a session.
+
+    Enter/Space confirm archive (default safe action).
+    Delete button triggers hard delete.
+    """
 
     BINDINGS = [
         Binding("escape", "dismiss(None)", "Cancel"),
+        Binding("enter", "confirm_archive", "Archive", show=False),
+        Binding("space", "confirm_archive", "Archive", show=False),
     ]
 
     def __init__(self, session_name: str, is_ghost: bool, is_orphan: bool) -> None:
@@ -133,21 +139,53 @@ class ArchiveModal(ModalScreen[str | None]):
             flags.append("[yellow]orphan[/yellow]")
         flag_str = "  " + "  ".join(flags) if flags else ""
         with Vertical(id="dialog"):
-            yield Label(f"[bold]Archive / Delete[/bold] — {self._session_name}{flag_str}", id="title")
+            yield Label(f"[bold]Archive session?[/bold]  [dim](d=archive  D=delete)[/dim]{flag_str}", id="title")
             yield Static(
-                "[dim]Hide[/dim] keeps the session in the index but filters it out.\n"
-                "[dim]Delete[/dim] removes it permanently from the YAML index.",
+                f"[bold]{self._session_name}[/bold]\n\n"
+                "[green]Archive[/green] tags as 'archived' — hidden from normal view, recoverable.\n"
+                "[red]Delete[/red] removes permanently from the YAML index.",
                 id="current",
             )
             with Horizontal(id="buttons"):
-                yield Button("Hide", variant="warning", id="hide")
-                yield Button("Delete", variant="error", id="delete")
+                yield Button("Archive (d)", variant="primary", id="archive")
+                yield Button("Delete (D)", variant="error", id="delete")
                 yield Button("Cancel", id="cancel")
 
+    def action_confirm_archive(self) -> None:
+        self.dismiss("archive")
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "hide":
-            self.dismiss("hide")
+        if event.button.id == "archive":
+            self.dismiss("archive")
         elif event.button.id == "delete":
             self.dismiss("delete")
         else:
             self.dismiss(None)
+
+
+class _DeleteConfirmModal(ModalScreen[bool]):
+    """Short inline confirm for hard delete (D key)."""
+
+    BINDINGS = [
+        Binding("escape", "dismiss(False)", "Cancel"),
+        Binding("y", "confirm_delete", "Yes", show=False),
+        Binding("n", "dismiss(False)", "No", show=False),
+    ]
+
+    def __init__(self, session_name: str) -> None:
+        super().__init__()
+        self._session_name = session_name
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="dialog"):
+            yield Label("[bold red]Permanently delete?[/bold red]  This cannot be undone.", id="title")
+            yield Static(f"[bold]{self._session_name}[/bold]", id="current")
+            with Horizontal(id="buttons"):
+                yield Button("Delete [y]", variant="error", id="delete")
+                yield Button("Cancel [n/Esc]", id="cancel")
+
+    def action_confirm_delete(self) -> None:
+        self.dismiss(True)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss(event.button.id == "delete")

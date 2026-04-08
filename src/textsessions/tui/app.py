@@ -22,11 +22,21 @@ from textual.widgets import (
 )
 
 from ..config import Config, load, repo_key
+from ..indexer import (
+    do_priority,
+    do_rename,
+    do_tag,
+    do_untag,
+    load_index,
+    resolve_session_id,
+    save_index,
+    write_legacy_tsv,
+    _update_legacy_priority,
+)
 from ..proxy import SessionStats, fmt_tokens, load_current_session
 from ..sessions import Session, delete_session_from_index, filter_sessions, load_sessions, sort_by_priority
-from .modals import ArchiveModal, PriorityModal, RenameModal, TagModal
+from .modals import ArchiveModal, PriorityModal, RenameModal, TagModal, _DeleteConfirmModal
 
-SESSIONS_INDEX = "claude-sessions-index"
 PRIORITY_COLORS = {"H0": "bold red", "1": "yellow", "2": "cyan", "3": "dim", "": ""}
 
 
@@ -140,7 +150,8 @@ class TextSessionsApp(App):
         Binding("t", "tag_session", "Tag"),
         Binding("p", "priority_session", "Priority"),
         Binding("r", "rename_session", "Rename"),
-        Binding("d", "archive_session", "Archive/Delete"),
+        Binding("d", "archive_session", "Archive"),
+        Binding("D", "delete_session_direct", "Delete"),
         Binding("enter", "resume_session", "Resume", show=True),
         Binding("/", "focus_filter", "Filter"),
         Binding("s", "toggle_sort", "Sort"),
@@ -267,10 +278,14 @@ class TextSessionsApp(App):
             parts = [t.strip() for t in result.split(",") if t.strip()]
             to_add = [t for t in parts if not t.startswith("-")]
             to_remove = [t[1:] for t in parts if t.startswith("-")]
+            index = load_index(key)
+            sid = resolve_session_id(index, s.id)
             if to_add:
-                subprocess.run([SESSIONS_INDEX, "tag", key, s.id, ",".join(to_add)], capture_output=True)
+                index = do_tag(index, sid, ",".join(to_add))
             if to_remove:
-                subprocess.run([SESSIONS_INDEX, "untag", key, s.id, ",".join(to_remove)], capture_output=True)
+                index = do_untag(index, sid, ",".join(to_remove))
+            save_index(key, index)
+            write_legacy_tsv(key, index)
             self._reload_sessions()
             self._populate_table()
 
@@ -285,7 +300,11 @@ class TextSessionsApp(App):
             if not result:
                 return
             key = repo_key(s.repo_path)
-            subprocess.run([SESSIONS_INDEX, "priority", key, s.id, result], capture_output=True)
+            index = load_index(key)
+            sid = resolve_session_id(index, s.id)
+            index = do_priority(index, sid, result)
+            _update_legacy_priority(key, sid, result)
+            save_index(key, index)
             self._reload_sessions()
             self._populate_table()
 
@@ -300,7 +319,11 @@ class TextSessionsApp(App):
             if not result:
                 return
             key = repo_key(s.repo_path)
-            subprocess.run([SESSIONS_INDEX, "rename", key, s.id, result], capture_output=True)
+            index = load_index(key)
+            sid = resolve_session_id(index, s.id)
+            index = do_rename(index, sid, result, repo_key=key)
+            save_index(key, index)
+            write_legacy_tsv(key, index)
             self._reload_sessions()
             self._populate_table()
 
@@ -312,9 +335,13 @@ class TextSessionsApp(App):
             return
 
         def handle(result: str | None) -> None:
-            if result == "hide":
+            if result == "archive":
                 key = repo_key(s.repo_path)
-                subprocess.run([SESSIONS_INDEX, "tag", key, s.id, "archived"], capture_output=True)
+                index = load_index(key)
+                sid = resolve_session_id(index, s.id)
+                index = do_tag(index, sid, "archived")
+                save_index(key, index)
+                write_legacy_tsv(key, index)
                 self._reload_sessions()
                 self._populate_table()
             elif result == "delete":
@@ -323,6 +350,23 @@ class TextSessionsApp(App):
                 self._populate_table()
 
         self.push_screen(ArchiveModal(s.name, s.is_ghost, s.is_orphan), handle)
+
+    def action_delete_session_direct(self) -> None:
+        """D — hard delete with a short inline confirm (no modal)."""
+        s = self._current_session()
+        if not s:
+            return
+
+        def handle(confirmed: bool) -> None:
+            if confirmed:
+                delete_session_from_index(s.repo_path, s.id)
+                self._reload_sessions()
+                self._populate_table()
+
+        self.push_screen(
+            _DeleteConfirmModal(s.name),
+            handle,
+        )
 
     def action_resume_session(self) -> None:
         s = self._current_session()

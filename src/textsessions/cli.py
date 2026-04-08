@@ -118,10 +118,18 @@ def proxy() -> None:
 @click.option("--repo", "-r", "repo_label", default="", help="Limit to one repo label")
 @click.option("--min-words", default=8, show_default=True, help="Orphan slug word threshold")
 @click.option("--json", "as_json", is_flag=True, help="Machine-readable output")
-@click.option("--delete", "do_delete", is_flag=True, help="Actually remove ghost/orphan sessions")
+@click.option("--archive", "do_archive", is_flag=True, help="Recommended: tag ghosts/orphans as 'archived' (reversible)")
+@click.option("--delete", "do_delete", is_flag=True, help="Hard-remove sessions from YAML index (irreversible). Requires --yes.")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation when --delete")
-def scan_ghosts(repo_label: str, min_words: int, as_json: bool, do_delete: bool, yes: bool) -> None:
-    """Scan for ghost (dead repo) and orphan (throwaway) sessions."""
+def scan_ghosts(repo_label: str, min_words: int, as_json: bool, do_archive: bool, do_delete: bool, yes: bool) -> None:
+    """Scan for ghost (dead repo) and orphan (throwaway) sessions.
+
+    \b
+    Default (no flags): dry-run report, no mutations.
+    --archive   Recommended: tag sessions as 'archived' so they disappear
+                from normal view but remain recoverable.
+    --delete    Permanent hard removal. Requires --yes. Use with care.
+    """
     config = load()
     if not config.repos:
         click.echo("No repos configured. Run: textsessions init")
@@ -161,10 +169,8 @@ def scan_ghosts(repo_label: str, min_words: int, as_json: bool, do_delete: bool,
         return
 
     console = Console()
-    from itertools import groupby
-    from operator import attrgetter
 
-    by_repo = {}
+    by_repo: dict[str, list] = {}
     for s in flagged:
         by_repo.setdefault(s.repo_label, []).append(s)
 
@@ -186,14 +192,43 @@ def scan_ghosts(repo_label: str, min_words: int, as_json: bool, do_delete: bool,
     if not flagged:
         return
 
+    if not do_archive and not do_delete:
+        console.print("[dim]Dry run — use --archive (recommended) or --delete --yes to act.[/dim]")
+        return
+
     if do_delete:
         if not yes:
-            click.confirm(f"Delete {len(flagged)} sessions?", abort=True)
+            click.confirm(
+                f"Permanently delete {len(flagged)} sessions? This cannot be undone.\n"
+                "  Tip: --archive is reversible and recommended instead.",
+                abort=True,
+            )
         deleted = 0
         for s in flagged:
             if delete_session_from_index(s.repo_path, s.id):
                 deleted += 1
         console.print(f"[green]Deleted {deleted} sessions.[/green]")
+        return
+
+    if do_archive:
+        from .indexer import do_tag, load_index, save_index, write_legacy_tsv
+        from .config import repo_key as _repo_key
+        archived = 0
+        # Group by repo_path to batch index loads
+        by_path: dict[str, list] = {}
+        for s in flagged:
+            by_path.setdefault(str(s.repo_path), []).append(s)
+        for repo_path_str, sessions in by_path.items():
+            from pathlib import Path as _Path
+            rkey = _repo_key(_Path(repo_path_str))
+            index = load_index(rkey)
+            for s in sessions:
+                if s.id in index and "archived" not in index[s.id].get("tags", []):
+                    index = do_tag(index, s.id, "archived")
+                    archived += 1
+            save_index(rkey, index)
+            write_legacy_tsv(rkey, index)
+        console.print(f"[green]Archived {archived} sessions.[/green]")
 
 
 @main.command()
@@ -209,3 +244,281 @@ def config() -> None:
         rec = " [dim](recursive)[/dim]" if r.recursive else ""
         console.print(f"  [bold]{r.label}[/bold]  {r.path}  profile={r.profile}{rec}")
     console.print(f"\n  Proxy cache: [dim]{cfg.proxy.cache_dir}[/dim]")
+
+
+# ---------------------------------------------------------------------------
+# Index subcommand group
+# ---------------------------------------------------------------------------
+
+@main.group("index")
+def index_group() -> None:
+    """Build and mutate session YAML indexes."""
+
+
+@index_group.command("build")
+@click.argument("repo_key_arg", metavar="REPO-KEY")
+@click.argument("pairs", nargs=-1, required=True, metavar="DIR::PATH [DIR::PATH ...]")
+def index_build(repo_key_arg: str, pairs: tuple[str, ...]) -> None:
+    """Rebuild the YAML index from .jsonl files.
+
+    REPO-KEY is the repo identifier (e.g. -Users-projects-myrepo).
+    Each DIR::PATH pair is <claude_dir>::<sessions_dir>.
+    """
+    from .indexer import build_index
+    index = build_index(repo_key_arg, list(pairs))
+    click.echo(f"  Built index for {repo_key_arg}: {len(index)} sessions")
+
+
+@index_group.command("tag")
+@click.argument("repo_key_arg", metavar="REPO-KEY")
+@click.argument("prefix")
+@click.argument("tags_csv")
+def index_tag(repo_key_arg: str, prefix: str, tags_csv: str) -> None:
+    """Add tags to a session."""
+    from .indexer import do_tag, load_index, resolve_session_id, save_index, write_legacy_tsv
+    index = load_index(repo_key_arg)
+    sid = resolve_session_id(index, prefix)
+    index = do_tag(index, sid, tags_csv)
+    save_index(repo_key_arg, index)
+    write_legacy_tsv(repo_key_arg, index)
+    merged = index[sid].get("tags", [])
+    click.echo(f"  {sid[:8]}  tags: {', '.join(merged)}")
+
+
+@index_group.command("untag")
+@click.argument("repo_key_arg", metavar="REPO-KEY")
+@click.argument("prefix")
+@click.argument("tags_csv")
+def index_untag(repo_key_arg: str, prefix: str, tags_csv: str) -> None:
+    """Remove tags from a session."""
+    from .indexer import do_untag, load_index, resolve_session_id, save_index, write_legacy_tsv
+    index = load_index(repo_key_arg)
+    sid = resolve_session_id(index, prefix)
+    index = do_untag(index, sid, tags_csv)
+    save_index(repo_key_arg, index)
+    write_legacy_tsv(repo_key_arg, index)
+    remaining = index[sid].get("tags", [])
+    click.echo(f"  {sid[:8]}  tags: {', '.join(remaining) if remaining else '(none)'}")
+
+
+@index_group.command("rename")
+@click.argument("repo_key_arg", metavar="REPO-KEY")
+@click.argument("prefix")
+@click.argument("new_title", nargs=-1, required=True)
+def index_rename(repo_key_arg: str, prefix: str, new_title: tuple[str, ...]) -> None:
+    """Rename a session (update slug/name in the index and append custom-title to .jsonl)."""
+    from .indexer import do_rename, load_index, resolve_session_id, save_index, write_legacy_tsv
+    title = " ".join(new_title)
+    index = load_index(repo_key_arg)
+    sid = resolve_session_id(index, prefix)
+    index = do_rename(index, sid, title, repo_key=repo_key_arg)
+    save_index(repo_key_arg, index)
+    write_legacy_tsv(repo_key_arg, index)
+    click.echo(f"  {sid[:8]}  → {index[sid]['slug']}")
+
+
+@index_group.command("priority")
+@click.argument("repo_key_arg", metavar="REPO-KEY")
+@click.argument("prefix")
+@click.argument("level", default="", required=False)
+def index_priority(repo_key_arg: str, prefix: str, level: str) -> None:
+    """Set or show session priority (H0, 1, 2, 3, clear)."""
+    from .indexer import _update_legacy_priority, do_priority, load_index, resolve_session_id, save_index
+    index = load_index(repo_key_arg)
+    sid = resolve_session_id(index, prefix)
+    entry = index[sid]
+
+    if not level:
+        pri = entry.get("priority", "")
+        badge = f"[{pri}]" if pri.startswith("H") else (f"[P{pri}]" if pri else "[no priority]")
+        click.echo(f"  {sid[:8]}  {badge}  {entry['slug']}")
+        return
+
+    if level not in ("H0", "1", "2", "3", "clear"):
+        click.echo(f"Invalid priority: {level} (use H0, 1, 2, 3, or clear)", err=True)
+        sys.exit(1)
+
+    index = do_priority(index, sid, level)
+    _update_legacy_priority(repo_key_arg, sid, level)
+    save_index(repo_key_arg, index)
+
+    pri = entry.get("priority", "")
+    if level == "clear":
+        click.echo(f"  {sid[:8]}  [cleared]  {entry['slug']}")
+    else:
+        badge = f"[{level}]" if level.startswith("H") else f"[P{level}]"
+        click.echo(f"  {sid[:8]}  {badge}  {entry['slug']}")
+
+
+@index_group.command("tags")
+@click.argument("repo_key_arg", metavar="REPO-KEY")
+def index_tags(repo_key_arg: str) -> None:
+    """List all tags in use with counts."""
+    from .indexer import do_tags, load_index
+    index = load_index(repo_key_arg)
+    counts = do_tags(index)
+    if not counts:
+        click.echo("  No tags in use")
+        return
+    for tag, count in sorted(counts.items(), key=lambda x: (-x[1], x[0])):
+        click.echo(f"  #{tag}  ({count})")
+
+
+@index_group.command("delete")
+@click.argument("repo_key_arg", metavar="REPO-KEY")
+@click.argument("session_id")
+def index_delete(repo_key_arg: str, session_id: str) -> None:
+    """Remove a session from the YAML index (permanent)."""
+    from .indexer import delete_session, load_index, save_index, write_legacy_tsv
+    index = load_index(repo_key_arg)
+    if session_id not in index:
+        click.echo(f"  Session {session_id[:8]} not found", err=True)
+        sys.exit(1)
+    index = delete_session(index, session_id)
+    save_index(repo_key_arg, index)
+    write_legacy_tsv(repo_key_arg, index)
+    click.echo(f"  {session_id[:8]}  deleted")
+
+
+# ---------------------------------------------------------------------------
+# Backwards-compat entrypoint: mirrors old claude-sessions-index CLI
+# Usage: claude-sessions-index <cmd> <repo-key> [args...]
+# ---------------------------------------------------------------------------
+
+@click.command("claude-sessions-index", context_settings={"ignore_unknown_options": True})
+@click.argument("args", nargs=-1, type=click.UNPROCESSED)
+def sessions_index_compat(args: tuple[str, ...]) -> None:
+    """Backwards-compatible wrapper: translates old claude-sessions-index CLI to textsessions index <cmd>."""
+    from .indexer import (
+        _update_legacy_priority,
+        build_index,
+        do_priority,
+        do_rename,
+        do_tag,
+        do_tags,
+        do_untag,
+        load_index,
+        resolve_session_id,
+        save_index,
+        write_legacy_tsv,
+    )
+
+    argv = list(args)
+    if len(argv) < 2:
+        click.echo("Usage: claude-sessions-index <command> <repo-key> [args...]", err=True)
+        sys.exit(1)
+
+    cmd = argv[0]
+    rkey = argv[1]
+    rest = argv[2:]
+
+    if cmd == "list":
+        limit = 10
+        filter_str = ""
+        tag_filter = ""
+        sort_by_priority_flag = False
+        pairs: list[str] = []
+        i = 0
+        while i < len(rest):
+            arg = rest[i]
+            if arg == "--limit" and i + 1 < len(rest):
+                limit = int(rest[i + 1]); i += 2
+            elif arg == "--filter" and i + 1 < len(rest):
+                filter_str = rest[i + 1]; i += 2
+            elif arg == "--tag" and i + 1 < len(rest):
+                tag_filter = rest[i + 1]; i += 2
+            elif arg == "--priority":
+                sort_by_priority_flag = True; i += 1
+            else:
+                pairs.append(arg); i += 1
+        index = build_index(rkey, pairs)
+        PRIORITY_ORDER = {"H0": 0, "1": 1, "2": 2, "3": 3}
+        display = []
+        for sid, e in index.items():
+            if filter_str and filter_str not in e["slug"].lower():
+                continue
+            if tag_filter and tag_filter not in e.get("tags", []):
+                continue
+            pri_val = PRIORITY_ORDER.get(e.get("priority", ""), 9)
+            display.append((pri_val, e["last_active"], sid[:8], e["profile"], e["last_active"], e["slug"], sid, e.get("priority", ""), e.get("tags", [])))
+        if sort_by_priority_flag:
+            display.sort(key=lambda x: (x[0], x[1]))
+        shown = 0
+        for pri_val, _, short_id, prof, last_dt, slug, full_sid, pri_lbl, tags in display:
+            if shown >= limit:
+                break
+            pri_badge = f"[{pri_lbl}] " if pri_lbl.startswith("H") else (f"[P{pri_lbl}] " if pri_lbl else "")
+            tag_str = "  " + " ".join(f"#{t}" for t in tags) if tags else ""
+            click.echo(f"  {short_id}  {pri_badge}[{prof}]  {last_dt}  {slug}{tag_str}")
+            shown += 1
+
+    elif cmd == "tag":
+        if len(rest) < 2:
+            click.echo("Usage: claude-sessions-index tag <repo-key> <session-prefix> <tag1,tag2>", err=True)
+            sys.exit(1)
+        index = load_index(rkey)
+        sid = resolve_session_id(index, rest[0])
+        index = do_tag(index, sid, rest[1])
+        save_index(rkey, index)
+        click.echo(f"  {sid[:8]}  tags: {', '.join(index[sid].get('tags', []))}")
+
+    elif cmd == "untag":
+        if len(rest) < 2:
+            click.echo("Usage: claude-sessions-index untag <repo-key> <session-prefix> <tag1,tag2>", err=True)
+            sys.exit(1)
+        index = load_index(rkey)
+        sid = resolve_session_id(index, rest[0])
+        index = do_untag(index, sid, rest[1])
+        save_index(rkey, index)
+        remaining = index[sid].get("tags", [])
+        click.echo(f"  {sid[:8]}  tags: {', '.join(remaining) if remaining else '(none)'}")
+
+    elif cmd == "rename":
+        if len(rest) < 2:
+            click.echo("Usage: claude-sessions-index rename <repo-key> <session-prefix> <new title>", err=True)
+            sys.exit(1)
+        index = load_index(rkey)
+        sid = resolve_session_id(index, rest[0])
+        new_title = " ".join(rest[1:])
+        index = do_rename(index, sid, new_title, repo_key=rkey)
+        save_index(rkey, index)
+        write_legacy_tsv(rkey, index)
+        click.echo(f"  {sid[:8]}  → {index[sid]['slug']}")
+
+    elif cmd == "tags":
+        index = load_index(rkey)
+        counts = do_tags(index)
+        if not counts:
+            click.echo("  No tags in use")
+        else:
+            for tag, count in sorted(counts.items(), key=lambda x: (-x[1], x[0])):
+                click.echo(f"  #{tag}  ({count})")
+
+    elif cmd == "priority":
+        if not rest:
+            click.echo("Usage: claude-sessions-index priority <repo-key> <session-prefix> [H0|1|2|3|clear]", err=True)
+            sys.exit(1)
+        index = load_index(rkey)
+        sid = resolve_session_id(index, rest[0])
+        level = rest[1] if len(rest) > 1 else ""
+        entry = index[sid]
+        if not level:
+            pri = entry.get("priority", "")
+            badge = f"[{pri}]" if pri.startswith("H") else (f"[P{pri}]" if pri else "[no priority]")
+            click.echo(f"  {sid[:8]}  {badge}  {entry['slug']}")
+        else:
+            if level not in ("H0", "1", "2", "3", "clear"):
+                click.echo(f"Invalid priority: {level}", err=True)
+                sys.exit(1)
+            index = do_priority(index, sid, level)
+            _update_legacy_priority(rkey, sid, level)
+            save_index(rkey, index)
+            if level == "clear":
+                click.echo(f"  {sid[:8]}  [cleared]  {entry['slug']}")
+            else:
+                badge = f"[{level}]" if level.startswith("H") else f"[P{level}]"
+                click.echo(f"  {sid[:8]}  {badge}  {entry['slug']}")
+
+    else:
+        click.echo(f"Unknown command: {cmd}", err=True)
+        sys.exit(1)

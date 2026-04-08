@@ -1,0 +1,11 @@
+[2026-04-08T13:49:24Z] STEP 0: Starting task 002 — creating progress log — PASS
+[2026-04-08T13:50:26Z] STEP 1: Copy reference source to .files/reference/ — PASS
+[2026-04-08T13:51:33Z] STEP 2: Create textsessions/indexer.py — PASS
+[2026-04-08T13:52:47Z] STEP 3: Add index subcommands + compat entrypoint in cli.py — PASS
+[2026-04-08T13:56:25Z] STEP 1: Start — creating progress log — PASS
+[2026-04-08T13:57:25Z] STEP 2: Resume — auditing existing work, planning remaining steps — PASS
+[2026-04-08T14:01:11Z] STEP 3: Update TUI app.py to use indexer directly (no subprocess for mutations) — PASS
+[2026-04-08T14:01:11Z] STEP 4: Update pyproject.toml with claude-sessions-index compat entrypoint — PASS
+[2026-04-08T14:01:11Z] STEP 5: Fix scan-ghosts --archive / dry-run / --delete requires --yes — PASS
+[2026-04-08T14:01:11Z] STEP 6: Fix ArchiveModal UX archive-first + _DeleteConfirmModal — PASS
+[2026-04-08T14:03:20Z] STEP 7: Create tests/test_indexer.py + update test_scan_ghosts.py — PASS (55 tests pass)

@@ -96,6 +96,50 @@ def test_scan_ghosts_json_dry_run(fake_env):
     assert "b" * 32 not in ids
 
 
+def test_scan_ghosts_dry_run_no_mutations(fake_env):
+    """Default invocation (no flags) must not touch the index."""
+    config, state_dir, real_repo, ghost_repo, real_key, ghost_key = fake_env
+    before = (state_dir / f"{real_key}.yaml").read_text()
+
+    runner = CliRunner()
+    with patch("textsessions.cli.load", return_value=config), \
+         patch("textsessions.sessions.STATE_DIR", state_dir):
+        result = runner.invoke(main, ["scan-ghosts"])
+
+    assert result.exit_code == 0, result.output
+    assert "Dry run" in result.output
+    assert (state_dir / f"{real_key}.yaml").read_text() == before
+
+
+def test_scan_ghosts_archive(fake_env):
+    """--archive should tag ghost/orphan sessions as 'archived', not delete them."""
+    config, state_dir, real_repo, ghost_repo, real_key, ghost_key = fake_env
+
+    runner = CliRunner()
+    with patch("textsessions.cli.load", return_value=config), \
+         patch("textsessions.sessions.STATE_DIR", state_dir), \
+         patch("textsessions.indexer.STATE_DIR", state_dir), \
+         patch("textsessions.indexer.LEGACY_INDEX_DIR", state_dir / "legacy"):
+        result = runner.invoke(main, ["scan-ghosts", "--archive"])
+
+    assert result.exit_code == 0, result.output
+    assert "Archived" in result.output
+
+    # Orphan (a*32) should still exist but have 'archived' tag
+    real_index = yaml.safe_load((state_dir / f"{real_key}.yaml").read_text()) or {}
+    assert "a" * 32 in real_index  # not deleted
+    assert "archived" in real_index["a" * 32].get("tags", [])
+
+    # The tagged/priority session should be untouched
+    assert "b" * 32 in real_index
+    assert "archived" not in real_index["b" * 32].get("tags", [])
+
+    # Ghost repo session should still exist but be archived
+    ghost_index = yaml.safe_load((state_dir / f"{ghost_key}.yaml").read_text()) or {}
+    assert "c" * 32 in ghost_index
+    assert "archived" in ghost_index["c" * 32].get("tags", [])
+
+
 def test_scan_ghosts_delete(fake_env):
     config, state_dir, real_repo, ghost_repo, real_key, ghost_key = fake_env
 
@@ -115,3 +159,19 @@ def test_scan_ghosts_delete(fake_env):
     # Ghost repo session should be gone
     ghost_index = yaml.safe_load((state_dir / f"{ghost_key}.yaml").read_text()) or {}
     assert "c" * 32 not in ghost_index
+
+
+def test_scan_ghosts_delete_requires_yes(fake_env):
+    """--delete without --yes should prompt, not auto-delete."""
+    config, state_dir, real_repo, ghost_repo, real_key, ghost_key = fake_env
+    before = (state_dir / f"{real_key}.yaml").read_text()
+
+    runner = CliRunner()
+    with patch("textsessions.cli.load", return_value=config), \
+         patch("textsessions.sessions.STATE_DIR", state_dir):
+        # Provide 'n' to the confirmation prompt
+        result = runner.invoke(main, ["scan-ghosts", "--delete"], input="n\n")
+
+    assert result.exit_code != 0 or "Deleted" not in result.output
+    # Index should be unchanged
+    assert (state_dir / f"{real_key}.yaml").read_text() == before
