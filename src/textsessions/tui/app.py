@@ -314,20 +314,24 @@ class TextSessionsApp(App):
         def handle(result: str | None) -> None:
             if not result:
                 return
-            key = repo_key(s.repo_path)
-            parts = [t.strip() for t in result.split(",") if t.strip()]
-            to_add = [t for t in parts if not t.startswith("-")]
-            to_remove = [t[1:] for t in parts if t.startswith("-")]
-            index = load_index(key)
-            sid = resolve_session_id(index, s.id)
-            if to_add:
-                index = do_tag(index, sid, ",".join(to_add))
-            if to_remove:
-                index = do_untag(index, sid, ",".join(to_remove))
-            save_index(key, index)
-            write_legacy_tsv(key, index)
-            self._reload_sessions()
-            self._populate_table()
+            try:
+                key = repo_key(s.repo_path)
+                parts = [t.strip() for t in result.split(",") if t.strip()]
+                to_add = [t for t in parts if not t.startswith("-")]
+                to_remove = [t[1:] for t in parts if t.startswith("-")]
+                index = load_index(key)
+                sid = resolve_session_id(index, s.id)
+                if to_add:
+                    index = do_tag(index, sid, ",".join(to_add))
+                if to_remove:
+                    index = do_untag(index, sid, ",".join(to_remove))
+                save_index(key, index)
+                write_legacy_tsv(key, index)
+                self._reload_sessions()
+                self._populate_table()
+                self.notify("Tagged", severity="information")
+            except Exception as e:
+                self.notify(f"Tag failed: {e}", severity="error")
 
         self.push_screen(TagModal(s.name, s.tags), handle)
 
@@ -339,14 +343,18 @@ class TextSessionsApp(App):
         def handle(result: str | None) -> None:
             if not result:
                 return
-            key = repo_key(s.repo_path)
-            index = load_index(key)
-            sid = resolve_session_id(index, s.id)
-            index = do_priority(index, sid, result)
-            _update_legacy_priority(key, sid, result)
-            save_index(key, index)
-            self._reload_sessions()
-            self._populate_table()
+            try:
+                key = repo_key(s.repo_path)
+                index = load_index(key)
+                sid = resolve_session_id(index, s.id)
+                index = do_priority(index, sid, result)
+                _update_legacy_priority(key, sid, result)
+                save_index(key, index)
+                self._reload_sessions()
+                self._populate_table()
+                self.notify("Priority set", severity="information")
+            except Exception as e:
+                self.notify(f"Priority failed: {e}", severity="error")
 
         self.push_screen(PriorityModal(s.name, s.priority), handle)
 
@@ -358,14 +366,18 @@ class TextSessionsApp(App):
         def handle(result: str | None) -> None:
             if not result:
                 return
-            key = repo_key(s.repo_path)
-            index = load_index(key)
-            sid = resolve_session_id(index, s.id)
-            index = do_rename(index, sid, result, repo_key=key)
-            save_index(key, index)
-            write_legacy_tsv(key, index)
-            self._reload_sessions()
-            self._populate_table()
+            try:
+                key = repo_key(s.repo_path)
+                index = load_index(key)
+                sid = resolve_session_id(index, s.id)
+                index = do_rename(index, sid, result, repo_key=key)
+                save_index(key, index)
+                write_legacy_tsv(key, index)
+                self._reload_sessions()
+                self._populate_table()
+                self.notify("Renamed", severity="information")
+            except Exception as e:
+                self.notify(f"Rename failed: {e}", severity="error")
 
         self.push_screen(RenameModal(s.name, s.slug), handle)
 
@@ -376,18 +388,26 @@ class TextSessionsApp(App):
 
         def handle(result: str | None) -> None:
             if result == "archive":
-                key = repo_key(s.repo_path)
-                index = load_index(key)
-                sid = resolve_session_id(index, s.id)
-                index = do_tag(index, sid, "archived")
-                save_index(key, index)
-                write_legacy_tsv(key, index)
-                self._reload_sessions()
-                self._populate_table()
+                try:
+                    key = repo_key(s.repo_path)
+                    index = load_index(key)
+                    sid = resolve_session_id(index, s.id)
+                    index = do_tag(index, sid, "archived")
+                    save_index(key, index)
+                    write_legacy_tsv(key, index)
+                    self._reload_sessions()
+                    self._populate_table()
+                    self.notify("Archived", severity="information")
+                except Exception as e:
+                    self.notify(f"Archive failed: {e}", severity="error")
             elif result == "delete":
-                delete_session_from_index(s.repo_path, s.id)
-                self._reload_sessions()
-                self._populate_table()
+                try:
+                    delete_session_from_index(s.repo_path, s.id)
+                    self._reload_sessions()
+                    self._populate_table()
+                    self.notify("Deleted", severity="information")
+                except Exception as e:
+                    self.notify(f"Delete failed: {e}", severity="error")
 
         self.push_screen(ArchiveModal(s.name, s.is_ghost, s.is_orphan), handle)
 
@@ -399,9 +419,13 @@ class TextSessionsApp(App):
 
         def handle(confirmed: bool) -> None:
             if confirmed:
-                delete_session_from_index(s.repo_path, s.id)
-                self._reload_sessions()
-                self._populate_table()
+                try:
+                    delete_session_from_index(s.repo_path, s.id)
+                    self._reload_sessions()
+                    self._populate_table()
+                    self.notify("Deleted", severity="information")
+                except Exception as e:
+                    self.notify(f"Delete failed: {e}", severity="error")
 
         self.push_screen(
             _DeleteConfirmModal(s.name),
@@ -426,7 +450,9 @@ class TextSessionsApp(App):
         else:
             cmd = ["claude", "--resume", resume_id]
         with self.suspend():
-            subprocess.run(cmd, env=env, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+            result = subprocess.run(cmd, env=env, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+        if result.returncode != 0:
+            self.notify(f"Resume failed (exit {result.returncode})", severity="error")
 
     def action_new_session(self) -> None:
         # Determine available profiles (deduplicated, from configured repos)
@@ -462,7 +488,9 @@ class TextSessionsApp(App):
             })
 
             with self.suspend():
-                subprocess.run(cmd, env=env, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+                proc = subprocess.run(cmd, env=env, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+            if proc.returncode != 0:
+                self.notify(f"Launch failed (exit {proc.returncode})", severity="error")
 
             self._apply_post_launch_metadata(result, launch_time, known_ids)
 
