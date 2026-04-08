@@ -2,6 +2,7 @@
 id: "002"
 title: "Port claude-sessions-index into textsessions; archive-first UX"
 repo: textsessions
+phase: "phase-1"
 model: sonnet
 budget_usd: 4.00
 max_turns: 120

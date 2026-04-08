@@ -2,6 +2,7 @@
 id: "003"
 title: "Fix resume from TUI; new session with name and priority"
 repo: textsessions
+phase: "phase-1"
 model: sonnet
 budget_usd: 3.00
 max_turns: 80

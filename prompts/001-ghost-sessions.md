@@ -2,6 +2,7 @@
 id: "001"
 title: "Ghost session detection, archive and delete"
 repo: textsessions
+phase: "phase-1"
 model: sonnet
 budget_usd: 3.00
 max_turns: 80

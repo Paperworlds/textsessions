@@ -2,6 +2,7 @@
 id: "004"
 title: "Cloak profile integration and textsessions profile commands"
 repo: textsessions
+phase: "phase-1"
 model: sonnet
 budget_usd: 3.00
 max_turns: 80
