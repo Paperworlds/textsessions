@@ -300,5 +300,6 @@ class TextSessionsApp(App):
         profile = s.profile
         resume_id = s.id
         with self.suspend():
-            cmd = [self._config.claude_cmd, "--my-profile", profile, "--resume", resume_id]
+            binary = "claude" if profile == "default" else f"claude-{profile}"
+            cmd = [binary, "--resume", resume_id]
             subprocess.run(cmd)

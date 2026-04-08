@@ -37,7 +37,6 @@ class ProxyConfig:
 class Config:
     repos: list[RepoConfig] = field(default_factory=list)
     proxy: ProxyConfig = field(default_factory=ProxyConfig)
-    claude_cmd: str = "claude"
 
 
 def load() -> Config:
@@ -59,7 +58,7 @@ def load() -> Config:
     proxy = ProxyConfig(
         cache_dir=Path(proxy_data.get("cache_dir", str(Path.home() / ".cache" / "ai-proxy")))
     )
-    return Config(repos=repos, proxy=proxy, claude_cmd=data.get("claude_cmd", "claude"))
+    return Config(repos=repos, proxy=proxy)
 
 
 def save(config: Config) -> None:
@@ -78,7 +77,6 @@ def save(config: Config) -> None:
         "proxy": {
             "cache_dir": str(config.proxy.cache_dir),
         },
-        "claude_cmd": config.claude_cmd,
     }
     with open(CONFIG_PATH, "wb") as f:
         tomli_w.dump(data, f)
