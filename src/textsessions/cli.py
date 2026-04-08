@@ -35,9 +35,47 @@ def main(ctx: click.Context) -> None:
 
 @main.command()
 @click.option("--yes", "-y", is_flag=True, help="Non-interactive mode (auto-detect, no prompts)")
-def init(yes: bool) -> None:
+@click.option("--recursive", "recursive_dir", default="", metavar="PATH",
+              help="Scan PATH for git repos and add them all (non-interactive).")
+@click.option("--profile", "recursive_profile", default="default", show_default=True,
+              help="Profile to assign when using --recursive.")
+def init(yes: bool, recursive_dir: str, recursive_profile: str) -> None:
     """Interactive first-run setup: scan for Claude sessions and write config."""
+    if recursive_dir:
+        _init_recursive(Path(recursive_dir).expanduser(), recursive_profile)
+        return
     run_init(interactive=not yes)
+
+
+def _init_recursive(root: Path, profile: str) -> None:
+    """Find all git repos under root and add them to config."""
+    from rich.console import Console
+    console = Console()
+
+    if not root.exists():
+        console.print(f"[red]Path does not exist: {root}[/red]")
+        sys.exit(1)
+
+    # Find git repos (directories containing .git)
+    git_repos = sorted(p.parent for p in root.rglob(".git") if p.is_dir())
+    if not git_repos:
+        console.print(f"[yellow]No git repos found under {root}[/yellow]")
+        return
+
+    config = load()
+    existing_paths = {r.path for r in config.repos}
+    added = 0
+    for repo_path in git_repos:
+        if repo_path in existing_paths:
+            console.print(f"  [dim]skip[/dim] {repo_path.name}  (already configured)")
+            continue
+        label = repo_path.name
+        config.repos.append(RepoConfig(path=repo_path, label=label, profile=profile))
+        console.print(f"  [green]+[/green] {label}  [dim]{repo_path}[/dim]")
+        added += 1
+
+    save(config)
+    console.print(f"\n[green]Added {added} repos to config.[/green]")
 
 
 @main.command()
