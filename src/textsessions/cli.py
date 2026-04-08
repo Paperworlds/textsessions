@@ -272,15 +272,16 @@ def proxy() -> None:
 
 @main.command("scan-ghosts")
 @click.option("--repo", "-r", "repo_label", default="", help="Limit to one repo label")
-@click.option("--min-words", default=8, show_default=True, help="Orphan slug word threshold")
 @click.option("--json", "as_json", is_flag=True, help="Machine-readable output")
 @click.option("--archive", "do_archive", is_flag=True, help="Recommended: tag ghosts/orphans as 'archived' (reversible)")
 @click.option("--delete", "do_delete", is_flag=True, help="Hard-remove sessions from YAML index (irreversible). Requires --yes.")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation when --delete")
-def scan_ghosts(repo_label: str, min_words: int, as_json: bool, do_archive: bool, do_delete: bool, yes: bool) -> None:
+def scan_ghosts(repo_label: str, as_json: bool, do_archive: bool, do_delete: bool, yes: bool) -> None:
     """Scan for ghost (dead repo) and orphan (throwaway) sessions.
 
     \b
+    Orphans are sessions auto-named by Claude with a 5-8 char hex hash and
+    no tags or priority set.
     Default (no flags): dry-run report, no mutations.
     --archive   Recommended: tag sessions as 'archived' so they disappear
                 from normal view but remain recoverable.
@@ -295,18 +296,8 @@ def scan_ghosts(repo_label: str, min_words: int, as_json: bool, do_archive: bool
     if repo_label:
         all_sessions = [s for s in all_sessions if s.repo_label == repo_label or s.repo_label.startswith(repo_label + "/")]
 
-    # Override orphan threshold if custom
-    from .sessions import Session as _Session
-
-    def _is_orphan_custom(s: _Session) -> bool:
-        if s.tags or s.priority:
-            return False
-        if len(s.name) > 8 or " " in s.name:
-            return False
-        return len(s.slug.split()) <= min_words
-
     ghosts = [s for s in all_sessions if s.is_ghost]
-    orphans = [s for s in all_sessions if not s.is_ghost and _is_orphan_custom(s)]
+    orphans = [s for s in all_sessions if not s.is_ghost and s.is_orphan]
     flagged = ghosts + orphans
 
     if as_json:

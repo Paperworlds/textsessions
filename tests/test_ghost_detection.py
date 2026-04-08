@@ -46,36 +46,49 @@ class TestIsGhost:
 
 
 class TestIsOrphan:
-    def test_short_name_no_metadata_short_slug_is_orphan(self):
-        s = make_session(name="a1b2c", slug="hello there", tags=[], priority="")
+    def test_hex_hash_name_no_metadata_is_orphan(self):
+        s = make_session(name="c5796", tags=[], priority="")
         assert s.is_orphan is True
 
-    def test_has_tags_not_orphan(self):
-        s = make_session(name="a1b2c", slug="hello there", tags=["daily"])
-        assert s.is_orphan is False
-
-    def test_has_priority_not_orphan(self):
-        s = make_session(name="a1b2c", slug="hello there", priority="1")
-        assert s.is_orphan is False
-
-    def test_long_name_not_orphan(self):
-        s = make_session(name="my-real-feature-work", slug="hello there")
-        assert s.is_orphan is False
-
-    def test_name_with_spaces_not_orphan(self):
-        s = make_session(name="fix bug", slug="hello there")
-        assert s.is_orphan is False
-
-    def test_long_slug_not_orphan(self):
-        s = make_session(name="a1b2c", slug="implement the new authentication flow with oauth2 tokens and refresh")
-        assert s.is_orphan is False
-
-    def test_exactly_8_word_slug_is_orphan(self):
-        s = make_session(name="a1b2c", slug="one two three four five six seven eight")
+    def test_hex_hash_8chars_is_orphan(self):
+        s = make_session(name="ac4b7f3e", tags=[], priority="")
         assert s.is_orphan is True
 
-    def test_nine_word_slug_not_orphan(self):
-        s = make_session(name="a1b2c", slug="one two three four five six seven eight nine")
+    def test_hex_hash_tagged_not_orphan(self):
+        s = make_session(name="ac4b7", tags=["daily"])
+        assert s.is_orphan is False
+
+    def test_hex_hash_with_priority_not_orphan(self):
+        s = make_session(name="f68e2", priority="1")
+        assert s.is_orphan is False
+
+    def test_short_meaningful_name_not_orphan(self):
+        s = make_session(name="pp")
+        assert s.is_orphan is False
+
+    def test_hyphenated_name_not_orphan(self):
+        s = make_session(name="ws-internal")
+        assert s.is_orphan is False
+
+    def test_another_hyphenated_name_not_orphan(self):
+        s = make_session(name="prdx-admin")
+        assert s.is_orphan is False
+
+    def test_long_slug_hex_name_is_orphan(self):
+        # Slug length no longer matters — only the name pattern
+        s = make_session(name="c5796", slug="hello sir | how much context did i use this far?")
+        assert s.is_orphan is True
+
+    def test_hex_too_short_not_orphan(self):
+        s = make_session(name="a1b2")  # 4 chars — below threshold
+        assert s.is_orphan is False
+
+    def test_hex_too_long_not_orphan(self):
+        s = make_session(name="a1b2c3d4e")  # 9 chars — above threshold
+        assert s.is_orphan is False
+
+    def test_non_hex_short_name_not_orphan(self):
+        s = make_session(name="gx7z9")  # contains g, z — not hex
         assert s.is_orphan is False
 
 

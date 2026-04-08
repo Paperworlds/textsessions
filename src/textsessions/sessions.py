@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
+
+_HEX_NAME_RE = re.compile(r'^[0-9a-f]{5,8}$')
 
 import yaml
 
@@ -47,14 +50,10 @@ class Session:
 
     @property
     def is_orphan(self) -> bool:
-        """Heuristic: throwaway test session with no meaningful metadata."""
+        """Throwaway session: Claude auto-named with a 5-8 char hex hash, no metadata."""
         if self.tags or self.priority:
             return False
-        # Auto-generated name = just the ID prefix (≤8 chars, no spaces)
-        if len(self.name) > 8 or " " in self.name:
-            return False
-        # Very short slug = one-liner throwaway
-        return len(self.slug.split()) <= 8
+        return bool(_HEX_NAME_RE.match(self.name))
 
     @property
     def is_archived(self) -> bool:
