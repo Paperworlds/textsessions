@@ -34,9 +34,17 @@ class ProxyConfig:
 
 
 @dataclass
+class IntegrationsConfig:
+    """Integration toggles. True means 'use if available' (auto-detected at runtime)."""
+    cloak: bool = True    # set False to disable cloak even if installed
+    aiproxy: bool = True  # set False to disable ai-proxy even if running
+
+
+@dataclass
 class Config:
     repos: list[RepoConfig] = field(default_factory=list)
     proxy: ProxyConfig = field(default_factory=ProxyConfig)
+    integrations: IntegrationsConfig = field(default_factory=IntegrationsConfig)
 
 
 def load() -> Config:
@@ -58,7 +66,12 @@ def load() -> Config:
     proxy = ProxyConfig(
         cache_dir=Path(proxy_data.get("cache_dir", str(Path.home() / ".cache" / "ai-proxy")))
     )
-    return Config(repos=repos, proxy=proxy)
+    integrations_data = data.get("integrations", {})
+    integrations = IntegrationsConfig(
+        cloak=integrations_data.get("cloak", True),
+        aiproxy=integrations_data.get("aiproxy", True),
+    )
+    return Config(repos=repos, proxy=proxy, integrations=integrations)
 
 
 def save(config: Config) -> None:
@@ -76,6 +89,10 @@ def save(config: Config) -> None:
         ],
         "proxy": {
             "cache_dir": str(config.proxy.cache_dir),
+        },
+        "integrations": {
+            "cloak": config.integrations.cloak,
+            "aiproxy": config.integrations.aiproxy,
         },
     }
     with open(CONFIG_PATH, "wb") as f:

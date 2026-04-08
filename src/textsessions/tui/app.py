@@ -24,6 +24,7 @@ from textual.widgets import (
 )
 
 from ..config import Config, load, repo_key
+from ..profiles import build_launch_env, cloak_available
 from ..indexer import (
     do_priority,
     do_rename,
@@ -89,6 +90,13 @@ class SessionDetail(Static):
             ]
         else:
             lines.append("  [dim]Proxy not running or no data[/dim]")
+
+        # Show cloak hint once when not installed and session has a non-default profile
+        if s.profile != "default" and not cloak_available():
+            lines += [
+                "",
+                "[dim]Profiles: install cloak for isolation (textsessions profile status)[/dim]",
+            ]
 
         return "\n".join(lines)
 
@@ -190,6 +198,7 @@ class TextSessionsApp(App):
         self._populate_table()
         self.set_interval(5, self._refresh_proxy)
         self._refresh_proxy()
+        self.query_one("#sessions-table", DataTable).focus()
 
     def _reload_sessions(self) -> None:
         self._sessions = load_sessions(self._config)
@@ -382,8 +391,12 @@ class TextSessionsApp(App):
         cmd = ["claude", "--resume", resume_id]
         if profile != "default":
             cmd = ["claude", "--my-profile", profile, "--resume", resume_id]
+        env = build_launch_env(profile, {
+            "cloak": self._config.integrations.cloak,
+            "aiproxy": self._config.integrations.aiproxy,
+        })
         with self.suspend():
-            subprocess.run(cmd, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+            subprocess.run(cmd, env=env, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
 
     def action_new_session(self) -> None:
         # Determine available profiles (deduplicated, from configured repos)
@@ -415,9 +428,13 @@ class TextSessionsApp(App):
                 cmd += ["--my-profile", result.profile]
             if result.name:
                 cmd += ["--name", result.name]
+            env = build_launch_env(result.profile, {
+                "cloak": self._config.integrations.cloak,
+                "aiproxy": self._config.integrations.aiproxy,
+            })
 
             with self.suspend():
-                subprocess.run(cmd, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+                subprocess.run(cmd, env=env, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
 
             self._apply_post_launch_metadata(result, launch_time, known_ids)
 

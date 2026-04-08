@@ -45,6 +45,162 @@ def scan() -> None:
     run_init(interactive=False)
 
 
+
+# ---------------------------------------------------------------------------
+# Profile subcommand group
+# ---------------------------------------------------------------------------
+
+@main.group("profile")
+def profile_group() -> None:
+    """Manage cloak profiles and integration status."""
+
+
+@profile_group.command("status")
+def profile_status() -> None:
+    """Show integration status (cloak, ai-proxy)."""
+    from .profiles import (
+        aiproxy_available,
+        aiproxy_running,
+        cloak_available,
+        cloak_version,
+        list_cloak_profiles,
+    )
+
+    console = Console()
+
+    # Cloak
+    if cloak_available():
+        ver = cloak_version()
+        ver_str = f" ({ver})" if ver else ""
+        profiles = list_cloak_profiles()
+        profiles_str = f"  {len(profiles)} profiles: {', '.join(profiles)}" if profiles else "  no profiles found"
+        console.print(f"Cloak:    [green]installed{ver_str}[/green]{profiles_str}")
+    else:
+        console.print("Cloak:    [yellow]not installed[/yellow] — run: [dim]npm install -g @synth1s/cloak[/dim]")
+
+    # ai-proxy
+    if aiproxy_available():
+        if aiproxy_running():
+            console.print("ai-proxy: [green]installed, running[/green] (localhost:7474)")
+        else:
+            console.print("ai-proxy: [yellow]installed, not running[/yellow]")
+    else:
+        console.print("ai-proxy: [dim]not installed[/dim]")
+
+
+@profile_group.command("list")
+def profile_list() -> None:
+    """List cloak profiles with which repos use them."""
+    from .profiles import cloak_available, list_cloak_profiles
+
+    config = load()
+    console = Console()
+
+    cloak_profiles = list_cloak_profiles()
+
+    # Build mapping: profile -> list of repo labels from config
+    profile_repos: dict[str, list[str]] = {}
+    for p in cloak_profiles:
+        profile_repos[p] = []
+    for repo in config.repos:
+        p = repo.profile
+        if p not in profile_repos:
+            profile_repos[p] = []
+        profile_repos[p].append(repo.label)
+
+    if not profile_repos:
+        if not cloak_available():
+            console.print(
+                "[yellow]Cloak is not installed.[/yellow] Profiles exist in textsessions config "
+                "but won't be isolated until cloak is set up.\n"
+                "Run: [dim]npm install -g @synth1s/cloak[/dim]"
+            )
+        else:
+            console.print("[dim]No profiles found in ~/.cloak/profiles/ or config.[/dim]")
+        return
+
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("Profile")
+    table.add_column("Repos")
+    for profile, repos in sorted(profile_repos.items()):
+        repos_str = ", ".join(repos) if repos else "[dim](none configured)[/dim]"
+        table.add_row(profile, repos_str)
+    console.print(table)
+
+    if not cloak_available():
+        console.print(
+            "\n[dim]Note: cloak not installed — profiles exist in config but won't be isolated.[/dim]\n"
+            "[dim]Run: npm install -g @synth1s/cloak[/dim]"
+        )
+
+
+@profile_group.command("setup")
+@click.argument("name")
+def profile_setup(name: str) -> None:
+    """Guide user through creating a cloak profile named NAME."""
+    from .profiles import cloak_available, cloak_profile_dir
+
+    console = Console()
+
+    if not cloak_available():
+        console.print("[red]Cloak is not installed.[/red]")
+        console.print("Install it first:\n  [bold]npm install -g @synth1s/cloak[/bold]")
+        raise SystemExit(1)
+
+    d = cloak_profile_dir(name)
+    if d is not None:
+        console.print(f"[green]Profile '{name}' already exists:[/green] {d}")
+        return
+
+    console.print(f"[bold]Setting up cloak profile:[/bold] {name}\n")
+    console.print("Cloak requires an interactive browser-based OAuth login.")
+    console.print("Run the following command in your terminal:\n")
+    console.print(f"  [bold]cloak create {name}[/bold]\n")
+    console.print("After completing the login, verify with:")
+    console.print(f"  [bold]textsessions profile check[/bold]")
+
+
+@profile_group.command("check")
+def profile_check() -> None:
+    """Check that all profiles in config have a cloak profile dir."""
+    from .profiles import cloak_available, cloak_profile_dir
+
+    config = load()
+    console = Console()
+
+    used_profiles = sorted({r.profile for r in config.repos})
+    if not used_profiles:
+        console.print("[dim]No repos configured. Run: textsessions init[/dim]")
+        return
+
+    all_ok = True
+    for profile in used_profiles:
+        if profile == "default":
+            console.print(f"  [dim]{profile}[/dim]  [green]ok[/green] (uses system default)")
+            continue
+        if not cloak_available():
+            console.print(
+                f"  {profile}  [yellow]cloak not installed[/yellow] — "
+                f"run: [dim]npm install -g @synth1s/cloak[/dim]"
+            )
+            all_ok = False
+            continue
+        d = cloak_profile_dir(profile)
+        if d:
+            console.print(f"  [bold]{profile}[/bold]  [green]ok[/green]  {d}")
+        else:
+            console.print(
+                f"  [bold]{profile}[/bold]  [red]missing[/red] — "
+                f"run: [dim]textsessions profile setup {profile}[/dim]"
+            )
+            all_ok = False
+
+    if all_ok:
+        console.print("\n[green]All profiles OK.[/green]")
+    else:
+        console.print("\n[yellow]Some profiles need setup.[/yellow]")
+
+
 @main.command("sessions")
 @click.option("--filter", "-f", "query", default="", help="Filter by name/slug")
 @click.option("--tag", "-t", default="", help="Filter by tag")
