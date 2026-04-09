@@ -219,6 +219,8 @@ def build_index(repo_key: str, pairs: list[str]) -> dict:
             entry["priority"] = old["priority"]
         if old.get("tags"):
             entry["tags"] = old["tags"]
+        if old.get("pinned"):
+            entry["pinned"] = True
 
         new_index[sid] = entry
 
