@@ -26,6 +26,7 @@ from textual.widgets import (
 from ..config import Config, RepoConfig, load, repo_key
 from ..profiles import build_launch_env, cloak_available
 from ..indexer import (
+    do_pin,
     do_priority,
     do_rename,
     do_tag,
@@ -184,6 +185,7 @@ class TextSessionsApp(App):
         Binding("d", "archive_session", "Archive"),
         Binding("D", "delete_session_direct", "Delete"),
 
+        Binding("x", "pin_session", "Pin"),
         Binding("n", "new_session", "New", show=True),
         Binding("/", "focus_filter", "Filter"),
         Binding("a", "toggle_all", "All"),
@@ -250,7 +252,9 @@ class TextSessionsApp(App):
         table.add_columns("Name", "Repo", "Profile", "Tags", "Pri", "Last Active")
         for s in self._filtered:
             pri = s.display_priority
-            if s.is_ghost:
+            if s.pinned:
+                name_cell = f"[bold cyan]★[/bold cyan] {s.name}"
+            elif s.is_ghost:
                 name_cell = f"[dim]~{s.name}[/dim]"
             elif s.is_orphan:
                 name_cell = f"[dim]{s.name}[/dim]"
@@ -456,6 +460,24 @@ class TextSessionsApp(App):
             _DeleteConfirmModal(s.name),
             handle,
         )
+
+    def action_pin_session(self) -> None:
+        s = self._current_session()
+        if not s:
+            return
+        try:
+            key = repo_key(s.repo_path)
+            index = load_index(key)
+            sid = resolve_session_id(index, s.id)
+            index = do_pin(index, sid, not s.pinned)
+            save_index(key, index)
+            write_legacy_tsv(key, index)
+            self._reload_sessions()
+            self._populate_table()
+            verb = "Pinned" if not s.pinned else "Unpinned"
+            self.notify(verb, severity="information")
+        except Exception as e:
+            self.notify(f"Pin failed: {e}", severity="error")
 
     def action_resume_session(self) -> None:
         s = self._current_session()

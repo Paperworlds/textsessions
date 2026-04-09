@@ -339,6 +339,16 @@ def do_tags(index: dict) -> dict[str, int]:
     return counts
 
 
+def do_pin(index: dict, session_id: str, pinned: bool) -> dict:
+    """Set or clear the pinned flag on a session."""
+    entry = index.setdefault(session_id, {})
+    if pinned:
+        entry["pinned"] = True
+    else:
+        entry.pop("pinned", None)
+    return index
+
+
 def delete_session(index: dict, sid: str) -> dict:
     """Remove a session from the index dict. Returns the (mutated) index."""
     index.pop(sid, None)

@@ -30,6 +30,7 @@ class Session:
     priority: str = ""
     repo_label: str = ""
     repo_path: Path = field(default_factory=Path)
+    pinned: bool = False
 
     @property
     def priority_order(self) -> int:
@@ -89,6 +90,7 @@ def _sessions_from_index(yaml_path: Path, repo_label: str, repo_path: Path) -> l
             priority=entry.get("priority", ""),
             repo_label=repo_label,
             repo_path=repo_path,
+            pinned=bool(entry.get("pinned", False)),
         ))
     return sessions
 
@@ -124,8 +126,10 @@ def load_sessions(config: Config, show_archived: bool = False) -> list[Session]:
         sessions = _sessions_from_index(yaml_path, repo.label, repo.path)
         all_sessions.extend(sessions)
 
-    # Sort by last_active descending
-    all_sessions.sort(key=lambda s: s.last_active, reverse=True)
+    # Sort: pinned first, then by last_active descending within each group
+    pinned = sorted([s for s in all_sessions if s.pinned], key=lambda s: s.last_active, reverse=True)
+    rest = sorted([s for s in all_sessions if not s.pinned], key=lambda s: s.last_active, reverse=True)
+    all_sessions = pinned + rest
     if not show_archived:
         all_sessions = [s for s in all_sessions if not s.is_archived]
     return all_sessions
@@ -229,4 +233,6 @@ def delete_session_from_index(repo_path: Path, session_id: str) -> bool:
 
 
 def sort_by_priority(sessions: list[Session]) -> list[Session]:
-    return sorted(sessions, key=lambda s: (s.priority_order, s.last_active), reverse=False)
+    pinned = sorted([s for s in sessions if s.pinned], key=lambda s: (s.priority_order, s.last_active))
+    rest = sorted([s for s in sessions if not s.pinned], key=lambda s: (s.priority_order, s.last_active))
+    return pinned + rest
