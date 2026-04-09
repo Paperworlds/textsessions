@@ -25,8 +25,24 @@ scan-ghosts repo="":
 sessions query="":
     uv run textsessions sessions {{ query }}
 
+# Check that all CLI top-level commands are listed in completions/textsessions.fish
+check-completions:
+    #!/usr/bin/env sh
+    missing=0
+    for cmd in $(uv run textsessions --help | awk '/^Commands:/,0 {if ($1 ~ /^[a-z]/) print $1}'); do
+        if ! grep -q "\"$cmd\"" completions/textsessions.fish; then
+            echo "MISSING from completions: $cmd"
+            missing=1
+        fi
+    done
+    if [ $missing -eq 0 ]; then
+        echo "All commands covered."
+    else
+        exit 1
+    fi
+
 # Install shell completions (auto-detects fish/zsh/bash)
-install-completions:
+install-completions: check-completions
     #!/usr/bin/env sh
     shell=$(basename "$SHELL")
     case "$shell" in
