@@ -40,7 +40,7 @@ from ..indexer import (
 )
 from ..proxy import SessionStats, fmt_tokens, load_current_session
 from ..sessions import Session, delete_session_from_index, filter_sessions, load_sessions, sort_by_priority
-from .modals import ArchiveModal, NewSessionModal, NewSessionResult, PriorityModal, RenameModal, TagModal, _DeleteConfirmModal
+from .modals import ArchiveModal, HelpModal, NewSessionModal, NewSessionResult, PriorityModal, RenameModal, TagModal, _DeleteConfirmModal
 
 PRIORITY_COLORS = {"H0": "bold red", "1": "yellow", "2": "cyan", "3": "dim", "": ""}
 
@@ -193,6 +193,7 @@ class TextSessionsApp(App):
         Binding("g", "toggle_ghosts", "Ghosts"),
         Binding("ctrl+r", "reindex", "Reindex"),
         Binding("escape", "clear_filter", "Clear filter"),
+        Binding("?", "show_help", "Help"),
         Binding("q", "quit", "Quit"),
     ]
 
@@ -503,6 +504,9 @@ class TextSessionsApp(App):
             self.notify(verb, severity="information")
         except Exception as e:
             self.notify(f"Pin failed: {e}", severity="error")
+
+    def action_show_help(self) -> None:
+        self.push_screen(HelpModal())
 
     def action_resume_session(self) -> None:
         s = self._current_session()

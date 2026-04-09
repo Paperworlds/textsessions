@@ -201,6 +201,43 @@ class _DeleteConfirmModal(ModalScreen[bool]):
         self.dismiss(event.button.id == "delete")
 
 
+class HelpModal(ModalScreen[None]):
+    """Show all keybindings."""
+
+    BINDINGS = [
+        Binding("escape", "dismiss(None)", "Close"),
+        Binding("?", "dismiss(None)", "Close"),
+        Binding("q", "dismiss(None)", "Close"),
+    ]
+
+    HELP_ROWS = [
+        ("enter / click", "Resume session"),
+        ("n",             "New session"),
+        ("r",             "Rename session"),
+        ("t",             "Tag session"),
+        ("p",             "Set priority"),
+        ("x",             "Pin / unpin"),
+        ("d",             "Archive session"),
+        ("D",             "Delete session"),
+        ("a",             "Toggle all repos / current folder"),
+        ("s",             "Toggle sort (date / priority)"),
+        ("g",             "Toggle ghosts"),
+        ("ctrl+r",        "Reindex current scope"),
+        ("/",             "Focus filter"),
+        ("escape",        "Clear filter"),
+        ("?",             "This help"),
+        ("q",             "Quit"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="dialog"):
+            yield Label("[bold]Keybindings[/bold]", id="title")
+            for key, desc in self.HELP_ROWS:
+                yield Static(f"  [bold cyan]{key:<14}[/bold cyan] {desc}")
+            yield Static("")
+            yield Static("[dim]press ?, escape, or q to close[/dim]")
+
+
 class NewSessionModal(ModalScreen[NewSessionResult | None]):
     """Modal to launch a new Claude Code session with optional name and priority."""
 
