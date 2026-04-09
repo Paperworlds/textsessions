@@ -15,9 +15,23 @@ complete -c textsessions -f -n "__fish_use_subcommand" -a "init"          -d "In
 complete -c textsessions -f -n "__fish_use_subcommand" -a "scan"           -d "Scan for sessions"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "scan-ghosts"    -d "Scan for ghost/orphan sessions"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "sessions"       -d "List sessions"
+complete -c textsessions -f -n "__fish_use_subcommand" -a "reindex"        -d "Rebuild session indexes"
+complete -c textsessions -f -n "__fish_use_subcommand" -a "index"          -d "Build and mutate session indexes"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "proxy"          -d "Show proxy stats"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "config"         -d "Show config"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "profile"        -d "Manage profiles"
+
+# reindex flags
+complete -c textsessions -n "__fish_seen_subcommand_from reindex" -l repo -d "Limit to repo" -xa "(textsessions sessions --json 2>/dev/null | python3 -c \"import sys,json; [print(s.get('repo','')) for s in json.load(sys.stdin) if s.get('repo')]\" 2>/dev/null | sort -u)"
+
+# index subcommands
+complete -c textsessions -f -n "__fish_seen_subcommand_from index; and not __fish_seen_subcommand_from build delete priority rename tag tags untag" -a "build"    -d "Rebuild YAML index"
+complete -c textsessions -f -n "__fish_seen_subcommand_from index; and not __fish_seen_subcommand_from build delete priority rename tag tags untag" -a "delete"   -d "Remove a session"
+complete -c textsessions -f -n "__fish_seen_subcommand_from index; and not __fish_seen_subcommand_from build delete priority rename tag tags untag" -a "priority" -d "Set session priority"
+complete -c textsessions -f -n "__fish_seen_subcommand_from index; and not __fish_seen_subcommand_from build delete priority rename tag tags untag" -a "rename"   -d "Rename a session"
+complete -c textsessions -f -n "__fish_seen_subcommand_from index; and not __fish_seen_subcommand_from build delete priority rename tag tags untag" -a "tag"      -d "Add tags to a session"
+complete -c textsessions -f -n "__fish_seen_subcommand_from index; and not __fish_seen_subcommand_from build delete priority rename tag tags untag" -a "tags"     -d "List all tags"
+complete -c textsessions -f -n "__fish_seen_subcommand_from index; and not __fish_seen_subcommand_from build delete priority rename tag tags untag" -a "untag"    -d "Remove tags from a session"
 
 # scan-ghosts flags
 complete -c textsessions -n "__fish_seen_subcommand_from scan-ghosts" -l repo    -d "Limit to repo" -xa "data mono personal textlives textworld"
