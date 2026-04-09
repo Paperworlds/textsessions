@@ -260,16 +260,23 @@ class ActionsMixin:
             rk = _repo_key(Path(result.repo_path))
             known_ids: set[str] = set(load_index(rk).keys())
 
-            cmd = ["claude"]
-            if result.name:
-                cmd += ["--name", result.name]
+            import shlex
             env = build_launch_env(result.profile, {
                 "cloak": self._config.integrations.cloak,
                 "aiproxy": self._config.integrations.aiproxy,
             })
+            if "CLAUDE_CONFIG_DIR" in env:
+                base_cmd = "claude"
+            else:
+                base_cmd = self._config.ui.claude_cmd.format(profile=result.profile or "default")
+            fish_parts = [base_cmd]
+            if result.name:
+                fish_parts += ["--name", shlex.quote(result.name)]
+            cmd = ["fish", "-c", " ".join(fish_parts)]
 
             with self.suspend():
-                proc = subprocess.run(cmd, env=env, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+                proc = subprocess.run(cmd, env=env, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr,
+                                      cwd=result.repo_path)
             if proc.returncode != 0:
                 self.notify(f"Launch failed (exit {proc.returncode})", severity="error")
 

@@ -2,7 +2,7 @@
 
 You are the lead developer for `textsessions`, a Textual TUI for managing Claude Code sessions.
 
-## Project state (as of v0.3.3)
+## Project state (as of v0.3.4)
 
 ### What it does
 - TUI (`textsessions` or `ts`) shows all Claude sessions across configured repos
@@ -12,6 +12,7 @@ You are the lead developer for `textsessions`, a Textual TUI for managing Claude
 - `?` shows help modal
 - `ctrl+r` reindexes current repo
 - `--resume` hot path uses flat `_cache.json` for fast startup
+- Resume and new session both `cwd` into the session's repo before launching
 - tmux window rename on resume (both CLI and TUI)
 
 ### Architecture
@@ -31,8 +32,12 @@ You are the lead developer for `textsessions`, a Textual TUI for managing Claude
 - Prompts are numbered `NNN-slug.md` in `prompts/`, reports in `.files/reports/`
 - Progress logs go to `../logs/` (paperworlds root)
 
+### Config
+- `~/.config/textsessions/config.toml`
+- `[ui] claude_cmd` — command template for launching Claude, default `"claude"`. Supports `{profile}` substitution (e.g. `"claude-{profile}"` for fish function dispatch). CLAUDE_CONFIG_DIR (cloak) always overrides to plain `claude`.
+
 ### Current version
-v0.3.3
+v0.3.4
 
 ### Pending ideas / next work
 - See `pp status` for any pending prompts
