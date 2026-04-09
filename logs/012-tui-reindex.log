@@ -1,0 +1,7 @@
+Done. Summary of changes:
+
+- **`indexer.py`**: Added `reindex_repos(repos, claude_dirs) -> int` helper that consolidates the rebuild loop
+- **`cli.py`**: `reindex` command now delegates to `reindex_repos` instead of duplicating the loop
+- **`tui/app.py`**: Added `Binding("ctrl+r", "reindex", "Reindex")` and `action_reindex` that reindexes the active repo scope (or all repos if no filter), expanding recursive repos first, then reloads and repopulates the table with toast notifications
+
+All 100 existing tests pass.

@@ -1,0 +1,13 @@
+Done. Here's what was implemented:
+
+**`config.py`** — new `UiConfig` dataclass with `startup_repo: str = "all"`, wired into `Config`, `load()`, and `save()`.
+
+**`tui/app.py`** — `_repo_for_cwd(config)` does a longest-prefix match of `Path.cwd()` against configured repo paths. `on_mount` calls it when `startup_repo == "current"` and pre-populates both `_filter_query` and the Input widget value before `_populate_table`.
+
+**`tests/test_startup_repo_filter.py`** — 3 tests covering match, no-match, and closest-match cases. All 83 tests pass.
+
+To use it, add to `~/.config/textsessions/config.toml`:
+```toml
+[ui]
+startup_repo = "current"
+```

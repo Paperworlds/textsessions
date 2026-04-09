@@ -1,0 +1,15 @@
+Done. Here's a summary of what was implemented:
+
+**Resume fix** (`app.py:382-386`): Replaced `claude-<profile>` binary lookup with `claude --my-profile <profile>`, which works via the actual `claude` binary without needing fish functions on PATH. Added explicit stdin/stdout/stderr passthrough inside `self.suspend()`.
+
+**`NewSessionModal`** (`modals.py`): New modal triggered by `n` key with:
+- Name (optional text input)
+- Priority selector (none/H0/1/2/3)
+- Profile selector (pre-filled from current session's profile)
+Returns `NewSessionResult(name, priority, profile, repo_path)`.
+
+**`find_session_created_after`** (`indexer.py:344-368`): Loads the YAML index, filters out known pre-launch IDs, checks `last_active >= since`. Returns the single new session ID or `None` if ambiguous.
+
+**`action_new_session` + `_apply_post_launch_metadata`** (`app.py`): Snapshots known IDs before launch, runs `claude [--my-profile] [--name]`, then applies priority to the newly detected session ID.
+
+**Tests**: 10 tests passing — 5 for resume command construction (parametrized over default/personal/work), 5 for `find_session_created_after` edge cases.

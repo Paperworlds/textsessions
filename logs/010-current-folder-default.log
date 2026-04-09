@@ -1,0 +1,13 @@
+Done. Here's what was changed:
+
+**`config.py`**
+- `UiConfig.startup_repo` default: `"all"` → `"current"`
+- `load()` fallback: `"all"` → `"current"`
+
+**`tui/app.py`**
+- Added `_repo_filter: reactive[str]` and `_cwd_repo_label: str` — separates repo scope from text search
+- `on_mount`: sets `_repo_filter = matched.label` instead of polluting the text input
+- `_apply_filter`: passes `repo_label=self._repo_filter` to `filter_sessions`
+- New `Binding("a", "toggle_all", "All")` — toggles between current repo and all repos
+- `watch__repo_filter`: updates scope label below the filter input (`[dim]textsessions[/dim]` or `[dim]all repos[/dim]`)
+- `Label(id="scope-label")` added to `compose()` between filter input and table
