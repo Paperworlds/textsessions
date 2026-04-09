@@ -24,7 +24,7 @@ from textual.widgets import (
 )
 
 from ..config import Config, RepoConfig, load, repo_key
-from ..profiles import build_launch_env, cloak_available
+from ..profiles import build_launch_env, cloak_available, resume_cmd
 from ..indexer import (
     do_pin,
     do_priority,
@@ -538,12 +538,7 @@ class TextSessionsApp(App):
             "cloak": self._config.integrations.cloak,
             "aiproxy": self._config.integrations.aiproxy,
         })
-        # If cloak isn't installed and profile is non-default, invoke via fish
-        # so that fish functions like claude-work are available.
-        if profile and profile != "default" and "CLAUDE_CONFIG_DIR" not in env:
-            cmd = ["fish", "-c", f"claude-{profile} --resume {resume_id}"]
-        else:
-            cmd = ["claude", "--resume", resume_id]
+        cmd = resume_cmd(resume_id, s.name, profile, env)
         with self.suspend():
             result = subprocess.run(cmd, env=env, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
         if result.returncode != 0:

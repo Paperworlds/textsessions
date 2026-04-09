@@ -63,6 +63,28 @@ def aiproxy_running() -> bool:
         return False
 
 
+def resume_cmd(session_id: str, session_name: str, profile: str, env: dict[str, str]) -> list[str]:
+    """Return the argv list to resume a Claude session.
+
+    Handles tmux window rename and profile-based claude command selection.
+    Always returns a fish command so that fish functions (claude-<profile>) are available.
+    """
+    import shlex
+
+    if profile and profile != "default" and "CLAUDE_CONFIG_DIR" not in env:
+        claude_cmd = f"claude-{profile} --resume {shlex.quote(session_id)}"
+    else:
+        claude_cmd = f"claude --resume {shlex.quote(session_id)}"
+
+    if os.environ.get("TMUX"):
+        window_name = shlex.quote(session_name or session_id[:8])
+        fish_cmd = f"tmux rename-window {window_name}; set -lx CLAUDE_RESUME_NAME {window_name}; {claude_cmd}"
+    else:
+        fish_cmd = claude_cmd
+
+    return ["fish", "-c", fish_cmd]
+
+
 def build_launch_env(profile: str, integrations_enabled: dict[str, bool]) -> dict[str, str]:
     """Build subprocess env dict with cloak and ai-proxy integrations applied.
 

@@ -336,19 +336,10 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
             sys.exit(1)
         s = matched[0]
         import subprocess
-        import shlex
-        from .profiles import build_launch_env
+        from .profiles import build_launch_env, resume_cmd
         env = build_launch_env(s.profile, {"cloak": config.integrations.cloak, "aiproxy": config.integrations.aiproxy})
-        if s.profile and s.profile != "default" and "CLAUDE_CONFIG_DIR" not in env:
-            claude_cmd = f"claude-{s.profile} --resume {shlex.quote(s.id)}"
-        else:
-            claude_cmd = f"claude --resume {shlex.quote(s.id)}"
-        if os.environ.get("TMUX"):
-            window_name = shlex.quote(s.name or s.id[:8])
-            fish_cmd = f"tmux rename-window {window_name}; set -lx CLAUDE_RESUME_NAME {window_name}; {claude_cmd}"
-        else:
-            fish_cmd = claude_cmd
-        sys.exit(subprocess.run(["fish", "-c", fish_cmd], env=env).returncode)
+        cmd = resume_cmd(s.id, s.name, s.profile, env)
+        sys.exit(subprocess.run(cmd, env=env).returncode)
 
     filtered = filter_sessions(all_sessions, query=query, tag=tag, profile=profile, repo_label=repo)
     if by_priority:
