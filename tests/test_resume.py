@@ -1,46 +1,52 @@
-"""Tests for resume command construction."""
+"""Tests for resume command construction and cwd behaviour."""
 
 from __future__ import annotations
 
-import pytest
+import os
+from pathlib import Path
+from unittest.mock import patch
 
 
-def _build_resume_cmd(profile: str, resume_id: str) -> list[str]:
-    """Replicate the command-building logic from app.py."""
-    cmd = ["claude", "--resume", resume_id]
-    if profile != "default":
-        cmd = ["claude", "--my-profile", profile, "--resume", resume_id]
-    return cmd
+def test_resume_cmd_default_profile():
+    from textsessions.profiles import resume_cmd
+    env = {"HOME": str(Path.home())}
+    cmd = resume_cmd("abc123", "my-session", "default", env)
+    assert cmd[0] == "fish"
+    assert "claude --resume" in cmd[-1]
+    assert "abc123" in cmd[-1]
 
 
-@pytest.mark.parametrize("profile,resume_id,expected", [
-    (
-        "default",
-        "abc123",
-        ["claude", "--resume", "abc123"],
-    ),
-    (
-        "personal",
-        "def456",
-        ["claude", "--my-profile", "personal", "--resume", "def456"],
-    ),
-    (
-        "work",
-        "ghi789",
-        ["claude", "--my-profile", "work", "--resume", "ghi789"],
-    ),
-])
-def test_resume_cmd(profile: str, resume_id: str, expected: list[str]) -> None:
-    assert _build_resume_cmd(profile, resume_id) == expected
+def test_resume_cmd_non_default_profile_uses_fish_function():
+    from textsessions.profiles import resume_cmd
+    env = {"HOME": str(Path.home())}
+    cmd = resume_cmd("abc123", "my-session", "work", env)
+    assert cmd[0] == "fish"
+    assert "claude-work --resume" in cmd[-1]
 
 
-def test_resume_default_does_not_include_my_profile() -> None:
-    cmd = _build_resume_cmd("default", "xyz")
-    assert "--my-profile" not in cmd
+def test_resume_cmd_cloak_profile_uses_plain_claude():
+    """When CLAUDE_CONFIG_DIR is set (cloak active), use plain claude."""
+    from textsessions.profiles import resume_cmd
+    env = {"HOME": str(Path.home()), "CLAUDE_CONFIG_DIR": "/some/cloak/dir"}
+    cmd = resume_cmd("abc123", "my-session", "work", env)
+    assert "claude --resume" in cmd[-1]
+    assert "claude-work" not in cmd[-1]
 
 
-def test_resume_non_default_includes_my_profile() -> None:
-    cmd = _build_resume_cmd("personal", "xyz")
-    assert "--my-profile" in cmd
-    idx = cmd.index("--my-profile")
-    assert cmd[idx + 1] == "personal"
+def test_resume_cmd_tmux_renames_window():
+    from textsessions.profiles import resume_cmd
+    env = {"HOME": str(Path.home())}
+    with patch.dict(os.environ, {"TMUX": "/tmp/tmux-123/default,1234,0"}):
+        cmd = resume_cmd("abc123", "my-session", "default", env)
+    fish_script = cmd[-1]
+    assert "tmux rename-window" in fish_script
+    assert "my-session" in fish_script
+
+
+def test_resume_cmd_no_tmux_skips_rename():
+    from textsessions.profiles import resume_cmd
+    env = {"HOME": str(Path.home())}
+    with patch.dict(os.environ, {}, clear=True):
+        os.environ.pop("TMUX", None)
+        cmd = resume_cmd("abc123", "my-session", "default", env)
+    assert "tmux rename-window" not in cmd[-1]
