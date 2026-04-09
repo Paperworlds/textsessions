@@ -7,28 +7,28 @@ from pathlib import Path
 from unittest.mock import patch
 
 
-def test_resume_cmd_default_profile():
+def test_resume_cmd_default_template():
     from textsessions.profiles import resume_cmd
     env = {"HOME": str(Path.home())}
-    cmd = resume_cmd("abc123", "my-session", "default", env)
+    cmd = resume_cmd("abc123", "my-session", "work", env, claude_cmd_tpl="claude")
     assert cmd[0] == "fish"
     assert "claude --resume" in cmd[-1]
     assert "abc123" in cmd[-1]
 
 
-def test_resume_cmd_non_default_profile_uses_fish_function():
+def test_resume_cmd_profile_template_substituted():
     from textsessions.profiles import resume_cmd
     env = {"HOME": str(Path.home())}
-    cmd = resume_cmd("abc123", "my-session", "work", env)
+    cmd = resume_cmd("abc123", "my-session", "work", env, claude_cmd_tpl="claude-{profile}")
     assert cmd[0] == "fish"
     assert "claude-work --resume" in cmd[-1]
 
 
-def test_resume_cmd_cloak_profile_uses_plain_claude():
-    """When CLAUDE_CONFIG_DIR is set (cloak active), use plain claude."""
+def test_resume_cmd_cloak_overrides_template():
+    """When CLAUDE_CONFIG_DIR is set (cloak active), always use plain claude."""
     from textsessions.profiles import resume_cmd
     env = {"HOME": str(Path.home()), "CLAUDE_CONFIG_DIR": "/some/cloak/dir"}
-    cmd = resume_cmd("abc123", "my-session", "work", env)
+    cmd = resume_cmd("abc123", "my-session", "work", env, claude_cmd_tpl="claude-{profile}")
     assert "claude --resume" in cmd[-1]
     assert "claude-work" not in cmd[-1]
 

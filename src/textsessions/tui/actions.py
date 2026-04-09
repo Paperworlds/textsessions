@@ -233,7 +233,7 @@ class ActionsMixin:
             "cloak": self._config.integrations.cloak,
             "aiproxy": self._config.integrations.aiproxy,
         })
-        cmd = resume_cmd(resume_id, s.name, profile, env)
+        cmd = resume_cmd(resume_id, s.name, profile, env, self._config.ui.claude_cmd)
         with self.suspend():
             result = subprocess.run(cmd, env=env, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, cwd=s.repo_path)
         if result.returncode != 0:

@@ -43,6 +43,7 @@ class IntegrationsConfig:
 @dataclass
 class UiConfig:
     startup_repo: str = "current"  # "current" | "all"
+    claude_cmd: str = "claude"     # command to run; {profile} is substituted if present
 
 
 @dataclass
@@ -80,6 +81,7 @@ def load() -> Config:
     ui_data = data.get("ui", {})
     ui = UiConfig(
         startup_repo=ui_data.get("startup_repo", "current"),
+        claude_cmd=ui_data.get("claude_cmd", "claude"),
     )
     return Config(repos=repos, proxy=proxy, integrations=integrations, ui=ui)
 
