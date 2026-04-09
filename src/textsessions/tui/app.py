@@ -140,8 +140,11 @@ class TextSessionsApp(App):
         padding: 1;
     }
     #filter-input {
-        margin-bottom: 1;
         height: 3;
+    }
+    #scope-label {
+        margin-bottom: 1;
+        color: $text-muted;
     }
     DataTable {
         height: 1fr;
@@ -183,6 +186,7 @@ class TextSessionsApp(App):
 
         Binding("n", "new_session", "New", show=True),
         Binding("/", "focus_filter", "Filter"),
+        Binding("a", "toggle_all", "All"),
         Binding("s", "toggle_sort", "Sort"),
         Binding("g", "toggle_ghosts", "Ghosts"),
         Binding("escape", "clear_filter", "Clear filter"),
@@ -192,6 +196,8 @@ class TextSessionsApp(App):
     _sort_by_priority: reactive[bool] = reactive(False)
     _ghosts_only: reactive[bool] = reactive(False)
     _filter_query: reactive[str] = reactive("")
+    _repo_filter: reactive[str] = reactive("")
+    _cwd_repo_label: str = ""
     _sessions: list[Session] = []
     _filtered: list[Session] = []
     _config: Config
@@ -205,6 +211,7 @@ class TextSessionsApp(App):
         with Horizontal(id="main"):
             with Vertical(id="left-panel"):
                 yield Input(placeholder="/ to filter…", id="filter-input")
+                yield Label("", id="scope-label")
                 yield DataTable(id="sessions-table", cursor_type="row")
             with ScrollableContainer(id="right-panel"):
                 yield SessionDetail(id="detail")
@@ -212,13 +219,11 @@ class TextSessionsApp(App):
 
     def on_mount(self) -> None:
         self._reload_sessions()
-        if self._config.ui.startup_repo == "current":
-            matched = _repo_for_cwd(self._config)
-            if matched:
-                self._filter_query = matched.label
-                inp = self.query_one("#filter-input", Input)
-                inp.value = matched.label
-                self._apply_filter()
+        matched = _repo_for_cwd(self._config)
+        if matched and self._config.ui.startup_repo == "current":
+            self._cwd_repo_label = matched.label
+            self._repo_filter = matched.label
+            self._apply_filter()
         self._populate_table()
         self.set_interval(5, self._refresh_proxy)
         self._refresh_proxy()
@@ -230,7 +235,12 @@ class TextSessionsApp(App):
 
     def _apply_filter(self) -> None:
         q = self._filter_query
-        self._filtered = filter_sessions(self._sessions, query=q, ghosts_only=self._ghosts_only)
+        self._filtered = filter_sessions(
+            self._sessions,
+            query=q,
+            repo_label=self._repo_filter,
+            ghosts_only=self._ghosts_only,
+        )
         if self._sort_by_priority:
             self._filtered = sort_by_priority(self._filtered)
 
@@ -298,6 +308,21 @@ class TextSessionsApp(App):
         self._ghosts_only = not self._ghosts_only
         self._apply_filter()
         self._populate_table()
+
+    def action_toggle_all(self) -> None:
+        if self._repo_filter:
+            self._repo_filter = ""
+        else:
+            self._repo_filter = self._cwd_repo_label
+        self._apply_filter()
+        self._populate_table()
+
+    def watch__repo_filter(self, value: str) -> None:
+        try:
+            label = self.query_one("#scope-label", Label)
+            label.update(f"[dim]{value or 'all repos'}[/dim]")
+        except NoMatches:
+            pass
 
     def _current_session(self) -> Session | None:
         table = self.query_one("#sessions-table", DataTable)

@@ -42,7 +42,7 @@ class IntegrationsConfig:
 
 @dataclass
 class UiConfig:
-    startup_repo: str = "all"  # "current" | "all"
+    startup_repo: str = "current"  # "current" | "all"
 
 
 @dataclass
@@ -79,7 +79,7 @@ def load() -> Config:
     )
     ui_data = data.get("ui", {})
     ui = UiConfig(
-        startup_repo=ui_data.get("startup_repo", "all"),
+        startup_repo=ui_data.get("startup_repo", "current"),
     )
     return Config(repos=repos, proxy=proxy, integrations=integrations, ui=ui)
 
