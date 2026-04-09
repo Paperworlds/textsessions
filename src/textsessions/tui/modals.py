@@ -217,6 +217,7 @@ class HelpModal(ModalScreen[None]):
         ("t",             "Tag session"),
         ("p",             "Set priority"),
         ("x",             "Pin / unpin"),
+        ("y",             "Toggle pinned visibility"),
         ("d",             "Archive session"),
         ("D",             "Delete session"),
         ("a",             "Toggle all repos / current folder"),

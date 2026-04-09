@@ -186,6 +186,7 @@ class TextSessionsApp(App):
         Binding("D", "delete_session_direct", "Delete"),
 
         Binding("x", "pin_session", "Pin"),
+        Binding("y", "toggle_pins", "Pins"),
         Binding("n", "new_session", "New", show=True),
         Binding("/", "focus_filter", "Filter"),
         Binding("a", "toggle_all", "All"),
@@ -199,6 +200,7 @@ class TextSessionsApp(App):
 
     _sort_by_priority: reactive[bool] = reactive(False)
     _ghosts_only: reactive[bool] = reactive(False)
+    _show_pinned: reactive[bool] = reactive(True)
     _filter_query: reactive[str] = reactive("")
     _repo_filter: reactive[str] = reactive("")
     _cwd_repo_label: str = ""
@@ -245,6 +247,8 @@ class TextSessionsApp(App):
             repo_label=self._repo_filter,
             ghosts_only=self._ghosts_only,
         )
+        if not self._show_pinned:
+            self._filtered = [s for s in self._filtered if not s.pinned]
         if self._sort_by_priority:
             self._filtered = sort_by_priority(self._filtered)
 
@@ -315,6 +319,13 @@ class TextSessionsApp(App):
         self._apply_filter()
         self._populate_table()
 
+    def action_toggle_pins(self) -> None:
+        self._show_pinned = not self._show_pinned
+        self._apply_filter()
+        self._populate_table()
+        state = "visible" if self._show_pinned else "hidden"
+        self.notify(f"Pinned sessions {state}", severity="information")
+
     def action_toggle_all(self) -> None:
         if self._repo_filter:
             self._repo_filter = ""
@@ -347,12 +358,20 @@ class TextSessionsApp(App):
         except Exception as e:
             self.notify(f"Reindex failed: {e}", severity="error")
 
-    def watch__repo_filter(self, value: str) -> None:
+    def _update_scope_label(self) -> None:
         try:
             label = self.query_one("#scope-label", Label)
-            label.update(f"[dim]{value or 'all repos'}[/dim]")
+            repo_part = self._repo_filter or "all repos"
+            pin_part = "" if self._show_pinned else "  [dim red]pins hidden[/dim red]"
+            label.update(f"[dim]{repo_part}[/dim]{pin_part}")
         except NoMatches:
             pass
+
+    def watch__repo_filter(self, value: str) -> None:
+        self._update_scope_label()
+
+    def watch__show_pinned(self, value: bool) -> None:
+        self._update_scope_label()
 
     def _current_session(self) -> Session | None:
         table = self.query_one("#sessions-table", DataTable)
