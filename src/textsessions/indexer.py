@@ -215,12 +215,9 @@ def build_index(repo_key: str, pairs: list[str]) -> dict:
         old = old_index.get(sid, {})
         entry: dict = {"name": name, "profile": prof, "last_active": last_dt, "slug": slug}
 
-        if old.get("priority"):
-            entry["priority"] = old["priority"]
-        if old.get("tags"):
-            entry["tags"] = old["tags"]
-        if old.get("pinned"):
-            entry["pinned"] = True
+        for field in ("priority", "tags", "pinned", "archived", "name"):
+            if old.get(field):
+                entry[field] = old[field]
 
         new_index[sid] = entry
 

@@ -182,6 +182,37 @@ def test_build_index_preserves_priority(jsonl_dir, tmp_path):
     assert index[sid].get("priority") == "H0"
 
 
+def test_build_index_preserves_all_user_fields(jsonl_dir, tmp_path):
+    """All user-set fields survive a second build_index call."""
+    claude_dir, sessions_dir, sid = jsonl_dir
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+    pairs = [f"{claude_dir}::{sessions_dir}"]
+    # First build: no prior state
+    with patch("textsessions.indexer.STATE_DIR", state_dir), \
+         patch("textsessions.indexer.LEGACY_INDEX_DIR", tmp_path / "legacy"):
+        index = build_index("test-repo", pairs)
+
+    # Simulate user mutating several fields
+    index[sid]["priority"] = "1"
+    index[sid]["tags"] = ["keep-me"]
+    index[sid]["pinned"] = True
+    index[sid]["archived"] = True
+    index[sid]["name"] = "my-custom-name"
+    (state_dir / "test-repo.yaml").write_text(yaml.safe_dump(index))
+
+    # Second build: fields must survive
+    with patch("textsessions.indexer.STATE_DIR", state_dir), \
+         patch("textsessions.indexer.LEGACY_INDEX_DIR", tmp_path / "legacy"):
+        index2 = build_index("test-repo", pairs)
+
+    assert index2[sid].get("priority") == "1"
+    assert "keep-me" in index2[sid].get("tags", [])
+    assert index2[sid].get("pinned") is True
+    assert index2[sid].get("archived") is True
+    assert index2[sid].get("name") == "my-custom-name"
+
+
 # ---------------------------------------------------------------------------
 # load_index / save_index
 # ---------------------------------------------------------------------------
