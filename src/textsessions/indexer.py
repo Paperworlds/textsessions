@@ -228,6 +228,11 @@ def build_index(repo_key: str, pairs: list[str]) -> dict:
 
     save_index(repo_key, new_index)
     write_legacy_tsv(repo_key, new_index)
+
+    from .sessions import CACHE_PATH
+    if CACHE_PATH.exists():
+        CACHE_PATH.unlink()
+
     return new_index
 
 

@@ -15,7 +15,7 @@ import json as _json
 from . import __version__
 from .config import CONFIG_PATH, RepoConfig, load, repo_key, run_init, save
 from .proxy import fmt_tokens, load_all_time, load_current_session
-from .sessions import delete_session_from_index, filter_sessions, load_sessions, sort_by_priority
+from .sessions import CACHE_PATH, delete_session_from_index, filter_sessions, load_sessions, load_sessions_fast, sort_by_priority
 
 
 @click.group(invoke_without_command=True)
@@ -116,6 +116,8 @@ def reindex(repo_label: str) -> None:
         index = build_index(rk, pairs)
         click.echo(f"  {r.label}  {len(index)} sessions")
         total += len(index)
+    if CACHE_PATH.exists():
+        CACHE_PATH.unlink()
     click.echo(f"Done. {total} sessions indexed across {len(repos)} repos.")
 
 
@@ -338,7 +340,7 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
         if pairs:
             build_index(rk, pairs)
 
-    all_sessions = load_sessions(config)
+    all_sessions = load_sessions_fast(config) if resume_name else load_sessions(config)
 
     if resume_name:
         matched = [s for s in all_sessions if s.name == resume_name or s.id.startswith(resume_name) or s.name.startswith(resume_name)]

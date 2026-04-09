@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -11,6 +13,8 @@ _HEX_NAME_RE = re.compile(r'^[0-9a-f]{5,8}$')
 import yaml
 
 from .config import Config, RepoConfig, STATE_DIR, repo_key
+
+CACHE_PATH = STATE_DIR / "_cache.json"
 
 PRIORITY_ORDER = {"H0": 0, "1": 1, "2": 2, "3": 3, "": 9}
 
@@ -125,6 +129,61 @@ def load_sessions(config: Config, show_archived: bool = False) -> list[Session]:
     if not show_archived:
         all_sessions = [s for s in all_sessions if not s.is_archived]
     return all_sessions
+
+
+def _cache_is_fresh() -> bool:
+    """True if _cache.json exists and its mtime >= every *.yaml in STATE_DIR."""
+    if not CACHE_PATH.exists():
+        return False
+    cache_mtime = os.path.getmtime(CACHE_PATH)
+    for yaml_path in STATE_DIR.glob("*.yaml"):
+        if os.path.getmtime(yaml_path) > cache_mtime:
+            return False
+    return True
+
+
+def _write_cache(sessions: list[Session]) -> None:
+    """Serialise sessions to JSON cache (resume-relevant fields only)."""
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    data = [
+        {
+            "id": s.id,
+            "name": s.name,
+            "profile": s.profile,
+            "repo_label": s.repo_label,
+            "repo_path": str(s.repo_path),
+        }
+        for s in sessions
+    ]
+    with open(CACHE_PATH, "w") as f:
+        json.dump(data, f)
+
+
+def _load_cache() -> list[Session]:
+    """Deserialise Session objects from JSON cache."""
+    with open(CACHE_PATH) as f:
+        data = json.load(f)
+    sessions = []
+    for d in data:
+        sessions.append(Session(
+            id=d["id"],
+            name=d["name"],
+            profile=d["profile"],
+            last_active="",
+            slug="",
+            repo_label=d["repo_label"],
+            repo_path=Path(d["repo_path"]),
+        ))
+    return sessions
+
+
+def load_sessions_fast(config: Config) -> list[Session]:
+    """Load sessions, using flat JSON cache if fresh. Falls back to load_sessions."""
+    if _cache_is_fresh():
+        return _load_cache()
+    sessions = load_sessions(config)
+    _write_cache(sessions)
+    return sessions
 
 
 def filter_sessions(
