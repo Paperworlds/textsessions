@@ -6,7 +6,7 @@ repos:
 defaults:
   model: sonnet
   budget_usd: 2.00
-  claude_cmd: claude-work
+  claude_cmd: claude-personal
   extra_flags: ["--bare"]
 
 total_budget_usd: 20.00
