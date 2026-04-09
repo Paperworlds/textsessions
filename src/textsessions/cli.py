@@ -339,7 +339,7 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
         from .profiles import build_launch_env, resume_cmd
         env = build_launch_env(s.profile, {"cloak": config.integrations.cloak, "aiproxy": config.integrations.aiproxy})
         cmd = resume_cmd(s.id, s.name, s.profile, env)
-        sys.exit(subprocess.run(cmd, env=env).returncode)
+        sys.exit(subprocess.run(cmd, env=env, cwd=s.repo_path).returncode)
 
     filtered = filter_sessions(all_sessions, query=query, tag=tag, profile=profile, repo_label=repo)
     if by_priority:

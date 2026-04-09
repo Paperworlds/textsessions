@@ -235,7 +235,7 @@ class ActionsMixin:
         })
         cmd = resume_cmd(resume_id, s.name, profile, env)
         with self.suspend():
-            result = subprocess.run(cmd, env=env, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+            result = subprocess.run(cmd, env=env, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, cwd=s.repo_path)
         if result.returncode != 0:
             self.notify(f"Resume failed (exit {result.returncode})", severity="error")
 
