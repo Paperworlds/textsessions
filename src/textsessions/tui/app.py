@@ -225,20 +225,23 @@ class TextSessionsApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
-        self._reload_sessions()
+        self._sessions = load_sessions(self._config)
         matched = _repo_for_cwd(self._config)
         if matched and self._config.ui.startup_repo == "current":
             self._cwd_repo_label = matched.label
             self._repo_filter = matched.label
-            self._apply_filter()
-        self._populate_table()
+        self._refresh_view()
         self.set_interval(5, self._refresh_proxy)
         self._refresh_proxy()
         self.query_one("#sessions-table", DataTable).focus()
 
     def _reload_sessions(self) -> None:
         self._sessions = load_sessions(self._config)
+        self._refresh_view()
+
+    def _refresh_view(self) -> None:
         self._apply_filter()
+        self._populate_table()
 
     def _apply_filter(self) -> None:
         q = self._filter_query
@@ -299,8 +302,7 @@ class TextSessionsApp(App):
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "filter-input":
             self._filter_query = event.value
-            self._apply_filter()
-            self._populate_table()
+            self._refresh_view()
 
     def action_focus_filter(self) -> None:
         self.query_one("#filter-input", Input).focus()
@@ -312,18 +314,15 @@ class TextSessionsApp(App):
 
     def action_toggle_sort(self) -> None:
         self._sort_by_priority = not self._sort_by_priority
-        self._apply_filter()
-        self._populate_table()
+        self._refresh_view()
 
     def action_toggle_ghosts(self) -> None:
         self._ghosts_only = not self._ghosts_only
-        self._apply_filter()
-        self._populate_table()
+        self._refresh_view()
 
     def action_toggle_pins(self) -> None:
         self._show_pinned = not self._show_pinned
-        self._apply_filter()
-        self._populate_table()
+        self._refresh_view()
         state = "visible" if self._show_pinned else "hidden"
         self.notify(f"Pinned sessions {state}", severity="information")
 
@@ -332,8 +331,7 @@ class TextSessionsApp(App):
             self._repo_filter = ""
         else:
             self._repo_filter = self._cwd_repo_label
-        self._apply_filter()
-        self._populate_table()
+        self._refresh_view()
 
     def action_reindex(self) -> None:
         from ..config import detect_claude_dirs
@@ -354,7 +352,6 @@ class TextSessionsApp(App):
             claude_dirs = detect_claude_dirs()
             count = reindex_repos(expanded, claude_dirs)
             self._reload_sessions()
-            self._populate_table()
             self.notify(f"Reindexed — {count} sessions", severity="information")
         except Exception as e:
             self.notify(f"Reindex failed: {e}", severity="error")
@@ -403,7 +400,6 @@ class TextSessionsApp(App):
 
                 mutate_index(key, s.id, apply)
                 self._reload_sessions()
-                self._populate_table()
                 self.notify("Tagged", severity="information")
             except Exception as e:
                 self.notify(f"Tag failed: {e}", severity="error")
@@ -427,7 +423,6 @@ class TextSessionsApp(App):
 
                 mutate_index(key, s.id, apply)
                 self._reload_sessions()
-                self._populate_table()
                 self.notify("Priority set", severity="information")
             except Exception as e:
                 self.notify(f"Priority failed: {e}", severity="error")
@@ -446,7 +441,6 @@ class TextSessionsApp(App):
                 key = repo_key(s.repo_path)
                 mutate_index(key, s.id, lambda index, sid: do_rename(index, sid, result, repo_key=key))
                 self._reload_sessions()
-                self._populate_table()
                 self.notify("Renamed", severity="information")
             except Exception as e:
                 self.notify(f"Rename failed: {e}", severity="error")
@@ -464,7 +458,6 @@ class TextSessionsApp(App):
                     key = repo_key(s.repo_path)
                     mutate_index(key, s.id, lambda index, sid: do_tag(index, sid, "archived"))
                     self._reload_sessions()
-                    self._populate_table()
                     self.notify("Archived", severity="information")
                 except Exception as e:
                     self.notify(f"Archive failed: {e}", severity="error")
@@ -472,7 +465,6 @@ class TextSessionsApp(App):
                 try:
                     delete_session_from_index(s.repo_path, s.id)
                     self._reload_sessions()
-                    self._populate_table()
                     self.notify("Deleted", severity="information")
                 except Exception as e:
                     self.notify(f"Delete failed: {e}", severity="error")
@@ -490,7 +482,6 @@ class TextSessionsApp(App):
                 try:
                     delete_session_from_index(s.repo_path, s.id)
                     self._reload_sessions()
-                    self._populate_table()
                     self.notify("Deleted", severity="information")
                 except Exception as e:
                     self.notify(f"Delete failed: {e}", severity="error")
@@ -509,7 +500,6 @@ class TextSessionsApp(App):
             new_pinned = not s.pinned
             mutate_index(key, s.id, lambda index, sid: do_pin(index, sid, new_pinned))
             self._reload_sessions()
-            self._populate_table()
             verb = "Pinned" if new_pinned else "Unpinned"
             self.notify(verb, severity="information")
         except Exception as e:
@@ -596,4 +586,3 @@ class TextSessionsApp(App):
                 index = do_priority(index, sid, result.priority)
                 save_index(rk, index)
         self._reload_sessions()
-        self._populate_table()
