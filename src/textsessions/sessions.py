@@ -109,6 +109,19 @@ def _expand_recursive(repo: RepoConfig) -> list[RepoConfig]:
     return expanded
 
 
+def _sort_sessions(sessions: list[Session], by_priority: bool = False) -> list[Session]:
+    """Sort sessions pinned-first, then by last_active desc (or priority+last_active asc)."""
+    if by_priority:
+        key = lambda s: (s.priority_order, s.last_active)
+        reverse = False
+    else:
+        key = lambda s: s.last_active
+        reverse = True
+    pinned = sorted([s for s in sessions if s.pinned], key=key, reverse=reverse)
+    rest = sorted([s for s in sessions if not s.pinned], key=key, reverse=reverse)
+    return pinned + rest
+
+
 def load_sessions(config: Config, show_archived: bool = False) -> list[Session]:
     """Load all sessions from all configured repos, sorted by last_active desc."""
     all_sessions: list[Session] = []
@@ -126,10 +139,7 @@ def load_sessions(config: Config, show_archived: bool = False) -> list[Session]:
         sessions = _sessions_from_index(yaml_path, repo.label, repo.path)
         all_sessions.extend(sessions)
 
-    # Sort: pinned first, then by last_active descending within each group
-    pinned = sorted([s for s in all_sessions if s.pinned], key=lambda s: s.last_active, reverse=True)
-    rest = sorted([s for s in all_sessions if not s.pinned], key=lambda s: s.last_active, reverse=True)
-    all_sessions = pinned + rest
+    all_sessions = _sort_sessions(all_sessions)
     if not show_archived:
         all_sessions = [s for s in all_sessions if not s.is_archived]
     return all_sessions
@@ -233,6 +243,4 @@ def delete_session_from_index(repo_path: Path, session_id: str) -> bool:
 
 
 def sort_by_priority(sessions: list[Session]) -> list[Session]:
-    pinned = sorted([s for s in sessions if s.pinned], key=lambda s: (s.priority_order, s.last_active))
-    rest = sorted([s for s in sessions if not s.pinned], key=lambda s: (s.priority_order, s.last_active))
-    return pinned + rest
+    return _sort_sessions(sessions, by_priority=True)
