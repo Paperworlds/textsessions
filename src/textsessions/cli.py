@@ -90,7 +90,7 @@ def scan() -> None:
 def reindex(repo_label: str) -> None:
     """Rebuild session indexes from .jsonl files for configured repos."""
     from .config import detect_claude_dirs
-    from .indexer import build_index
+    from .indexer import reindex_repos
     config = load()
     if not config.repos:
         click.echo("No repos configured. Run: textsessions init")
@@ -102,20 +102,7 @@ def reindex(repo_label: str) -> None:
             click.echo(f"No repo matching '{repo_label}'", err=True)
             sys.exit(1)
     claude_dirs = detect_claude_dirs()
-    total = 0
-    for r in repos:
-        rk = repo_key(r.path)
-        pairs = [
-            f"{cd}::{cd / 'projects' / rk}"
-            for cd in claude_dirs
-            if (cd / "projects" / rk).exists()
-        ]
-        if not pairs:
-            click.echo(f"  [skip] {r.label}  (no .jsonl files found)")
-            continue
-        index = build_index(rk, pairs)
-        click.echo(f"  {r.label}  {len(index)} sessions")
-        total += len(index)
+    total = reindex_repos(list(repos), claude_dirs)
     if CACHE_PATH.exists():
         CACHE_PATH.unlink()
     click.echo(f"Done. {total} sessions indexed across {len(repos)} repos.")

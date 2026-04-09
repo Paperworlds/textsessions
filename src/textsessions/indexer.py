@@ -355,6 +355,24 @@ def delete_session(index: dict, sid: str) -> dict:
     return index
 
 
+def reindex_repos(repos: list, claude_dirs: list[Path]) -> int:
+    """Rebuild indexes for the given repos. Returns total session count."""
+    from .config import repo_key
+    total = 0
+    for r in repos:
+        rk = repo_key(r.path)
+        pairs = [
+            f"{cd}::{cd / 'projects' / rk}"
+            for cd in claude_dirs
+            if (cd / "projects" / rk).exists()
+        ]
+        if not pairs:
+            continue
+        index = build_index(rk, pairs)
+        total += len(index)
+    return total
+
+
 def find_session_created_after(repo_key: str, since: datetime, known_ids: set[str]) -> str | None:
     """Find the single new session added to repo_key's index after `since`.
 

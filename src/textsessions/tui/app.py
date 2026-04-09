@@ -191,6 +191,7 @@ class TextSessionsApp(App):
         Binding("a", "toggle_all", "All"),
         Binding("s", "toggle_sort", "Sort"),
         Binding("g", "toggle_ghosts", "Ghosts"),
+        Binding("ctrl+r", "reindex", "Reindex"),
         Binding("escape", "clear_filter", "Clear filter"),
         Binding("q", "quit", "Quit"),
     ]
@@ -320,6 +321,30 @@ class TextSessionsApp(App):
             self._repo_filter = self._cwd_repo_label
         self._apply_filter()
         self._populate_table()
+
+    def action_reindex(self) -> None:
+        from ..config import detect_claude_dirs
+        from ..indexer import reindex_repos
+        from ..sessions import _expand_recursive
+        repos = [r for r in self._config.repos if not self._repo_filter or r.label == self._repo_filter or r.label.startswith(self._repo_filter + "/")]
+        if not repos:
+            self.notify("No repos to reindex", severity="warning")
+            return
+        expanded = []
+        for r in repos:
+            if r.recursive:
+                expanded.extend(_expand_recursive(r))
+            else:
+                expanded.append(r)
+        try:
+            self.notify("Reindexing…", severity="information")
+            claude_dirs = detect_claude_dirs()
+            count = reindex_repos(expanded, claude_dirs)
+            self._reload_sessions()
+            self._populate_table()
+            self.notify(f"Reindexed — {count} sessions", severity="information")
+        except Exception as e:
+            self.notify(f"Reindex failed: {e}", severity="error")
 
     def watch__repo_filter(self, value: str) -> None:
         try:
