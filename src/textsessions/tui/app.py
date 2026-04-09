@@ -33,6 +33,7 @@ from ..indexer import (
     do_untag,
     find_session_created_after,
     load_index,
+    mutate_index,
     resolve_session_id,
     save_index,
     write_legacy_tsv,
@@ -393,14 +394,14 @@ class TextSessionsApp(App):
                 parts = [t.strip() for t in result.split(",") if t.strip()]
                 to_add = [t for t in parts if not t.startswith("-")]
                 to_remove = [t[1:] for t in parts if t.startswith("-")]
-                index = load_index(key)
-                sid = resolve_session_id(index, s.id)
-                if to_add:
-                    index = do_tag(index, sid, ",".join(to_add))
-                if to_remove:
-                    index = do_untag(index, sid, ",".join(to_remove))
-                save_index(key, index)
-                write_legacy_tsv(key, index)
+
+                def apply(index, sid):
+                    if to_add:
+                        do_tag(index, sid, ",".join(to_add))
+                    if to_remove:
+                        do_untag(index, sid, ",".join(to_remove))
+
+                mutate_index(key, s.id, apply)
                 self._reload_sessions()
                 self._populate_table()
                 self.notify("Tagged", severity="information")
@@ -419,11 +420,12 @@ class TextSessionsApp(App):
                 return
             try:
                 key = repo_key(s.repo_path)
-                index = load_index(key)
-                sid = resolve_session_id(index, s.id)
-                index = do_priority(index, sid, result)
-                _update_legacy_priority(key, sid, result)
-                save_index(key, index)
+
+                def apply(index, sid):
+                    do_priority(index, sid, result)
+                    _update_legacy_priority(key, sid, result)
+
+                mutate_index(key, s.id, apply)
                 self._reload_sessions()
                 self._populate_table()
                 self.notify("Priority set", severity="information")
@@ -442,11 +444,7 @@ class TextSessionsApp(App):
                 return
             try:
                 key = repo_key(s.repo_path)
-                index = load_index(key)
-                sid = resolve_session_id(index, s.id)
-                index = do_rename(index, sid, result, repo_key=key)
-                save_index(key, index)
-                write_legacy_tsv(key, index)
+                mutate_index(key, s.id, lambda index, sid: do_rename(index, sid, result, repo_key=key))
                 self._reload_sessions()
                 self._populate_table()
                 self.notify("Renamed", severity="information")
@@ -464,11 +462,7 @@ class TextSessionsApp(App):
             if result == "archive":
                 try:
                     key = repo_key(s.repo_path)
-                    index = load_index(key)
-                    sid = resolve_session_id(index, s.id)
-                    index = do_tag(index, sid, "archived")
-                    save_index(key, index)
-                    write_legacy_tsv(key, index)
+                    mutate_index(key, s.id, lambda index, sid: do_tag(index, sid, "archived"))
                     self._reload_sessions()
                     self._populate_table()
                     self.notify("Archived", severity="information")
@@ -512,14 +506,11 @@ class TextSessionsApp(App):
             return
         try:
             key = repo_key(s.repo_path)
-            index = load_index(key)
-            sid = resolve_session_id(index, s.id)
-            index = do_pin(index, sid, not s.pinned)
-            save_index(key, index)
-            write_legacy_tsv(key, index)
+            new_pinned = not s.pinned
+            mutate_index(key, s.id, lambda index, sid: do_pin(index, sid, new_pinned))
             self._reload_sessions()
             self._populate_table()
-            verb = "Pinned" if not s.pinned else "Unpinned"
+            verb = "Pinned" if new_pinned else "Unpinned"
             self.notify(verb, severity="information")
         except Exception as e:
             self.notify(f"Pin failed: {e}", severity="error")

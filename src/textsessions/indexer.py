@@ -348,6 +348,15 @@ def do_pin(index: dict, session_id: str, pinned: bool) -> dict:
     return index
 
 
+def mutate_index(repo_key: str, session_id: str, fn) -> None:
+    """Load index, resolve sid, apply fn(index, sid), save."""
+    index = load_index(repo_key)
+    sid = resolve_session_id(index, session_id)
+    fn(index, sid)
+    save_index(repo_key, index)
+    write_legacy_tsv(repo_key, index)
+
+
 def delete_session(index: dict, sid: str) -> dict:
     """Remove a session from the index dict. Returns the (mutated) index."""
     index.pop(sid, None)
