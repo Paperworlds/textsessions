@@ -134,7 +134,7 @@ class TextSessionsApp(ActionsMixin, App):
         padding: 1;
     }
     #filter-input {
-        height: 1;
+        height: 3;
     }
     #scope-label {
         margin-bottom: 1;
