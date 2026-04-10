@@ -1,6 +1,13 @@
 # Changelog
 
-## v0.4.0 (unreleased)
+## v0.4.1
+
+- `textsessions rename <name> <new title>` — rename a session by name with tab-completion
+- `textsessions tag <name> <tags>` — add/remove tags by name (`-tag` prefix to remove); tab-completion on session name
+- Sessions table: always shows **Name** first, then **Info** (description if set, otherwise slug)
+- Fix: `y` (toggle pins visibility) now keeps pinned sessions in the list sorted by last-active, instead of removing them
+
+## v0.4.0
 
 - `textsessions search "query"` — AI-powered natural language search over session history
 - `textsessions tree` — dump all repos and sessions as a YAML/JSON tree
