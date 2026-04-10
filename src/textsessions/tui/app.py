@@ -252,7 +252,12 @@ class TextSessionsApp(ActionsMixin, App):
     def _populate_table(self) -> None:
         table = self.query_one("#sessions-table", DataTable)
         table.clear(columns=True)
-        table.add_columns("Name", "Repo", "Profile / Tags", "Pri", "Last Active")
+        single_repo = bool(self._repo_filter)
+        cols = ["Name"]
+        if not single_repo:
+            cols.append("Repo")
+        cols += ["Profile / Tags", "Pri", "Last Active"]
+        table.add_columns(*cols)
         for s in self._filtered:
             pri = s.display_priority
             label = (s.description if s.description else s.name)[:40]
@@ -267,14 +272,11 @@ class TextSessionsApp(ActionsMixin, App):
             tags = [t for t in s.tags if t != "archived"]
             tags_str = "  " + " ".join(f"[cyan]#{t}[/cyan]" for t in tags) if tags else ""
             profile_cell = f"{s.profile}{tags_str}"
-            table.add_row(
-                name_cell,
-                s.repo_label,
-                profile_cell,
-                pri,
-                s.last_active,
-                key=s.id,
-            )
+            row = [name_cell]
+            if not single_repo:
+                row.append(s.repo_label)
+            row += [profile_cell, pri, s.last_active]
+            table.add_row(*row, key=s.id)
         # Re-select first row if available
         if self._filtered:
             table.move_cursor(row=0)
