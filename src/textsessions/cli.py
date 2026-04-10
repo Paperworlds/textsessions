@@ -864,13 +864,8 @@ def search_cmd(query: str, ai_profile: str, repo_label: str, limit: int, as_json
         f'If nothing matches, return {{"matches": [], "reason": "no relevant sessions found"}}.'
     )
 
-    # Derive the command to use
-    raw = ai_profile or config.ui.ai_search_profile  # e.g. "claude-personal" or "personal"
-    tpl = config.ui.claude_cmd
-    if "{profile}" in tpl:
-        ai_cmd = tpl.format(profile=raw)
-    else:
-        ai_cmd = raw  # treat as full command name
+    # ai_search_profile is always used as the full command (no template substitution)
+    ai_cmd = ai_profile or config.ui.ai_search_profile
 
     cmd = shlex.split(ai_cmd) + ["-p"]
 
