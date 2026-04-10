@@ -217,8 +217,14 @@ def filter_sessions(
     if ghosts_only:
         result = [s for s in result if s.is_ghost or s.is_orphan]
     if query:
-        q = query.lower()
-        result = [s for s in result if q in s.slug.lower() or q in s.name.lower() or q in s.description.lower()]
+        words = query.lower().split()
+        tag_filters = [w[1:] for w in words if w.startswith("#") and len(w) > 1]
+        text_words = [w for w in words if not w.startswith("#")]
+        for t in tag_filters:
+            result = [s for s in result if t in s.tags]
+        if text_words:
+            q = " ".join(text_words)
+            result = [s for s in result if q in s.slug.lower() or q in s.name.lower() or q in s.description.lower()]
     if tag:
         result = [s for s in result if tag in s.tags]
     if profile:
