@@ -718,6 +718,114 @@ def index_delete(repo_key_arg: str, session_id: str) -> None:
     click.echo(f"  {session_id[:8]}  deleted")
 
 
+@index_group.command("auto-rename")
+@click.argument("repo_key_arg", metavar="REPO-KEY", required=False)
+@click.option("--dry-run", is_flag=True, help="Preview changes without applying them")
+def index_auto_rename(repo_key_arg: str | None, dry_run: bool) -> None:
+    """Rename sessions whose name is a raw hex ID, using their slug as the new title.
+
+    Omit REPO-KEY to process all configured repos. Ghost sessions are skipped.
+    """
+    import re as _re
+    from .config import load, repo_key
+    from .indexer import do_rename, load_index, make_completion_name, save_index, write_legacy_tsv
+
+    _HEX = _re.compile(r"^[0-9a-f]{5,8}$")
+    config = load()
+
+    if repo_key_arg:
+        repos = [(r, repo_key_arg) for r in config.repos if repo_key(r.path) == repo_key_arg]
+        if not repos:
+            repos = [(None, repo_key_arg)]
+    else:
+        repos = [(r, repo_key(r.path)) for r in config.repos]
+
+    total = 0
+    for repo_cfg, rk in repos:
+        index = load_index(rk)
+        if not index:
+            continue
+
+        to_rename = []
+        for sid, entry in index.items():
+            name = entry.get("name", "")
+            if not _HEX.match(name):
+                continue
+            if repo_cfg and not (repo_cfg.path / ".git").exists():
+                continue  # skip ghosts
+            slug = entry.get("slug", "")
+            if not slug:
+                continue
+            to_rename.append((sid, name, slug))
+
+        if not to_rename:
+            continue
+
+        click.echo(f"\n{rk}  ({len(to_rename)} to rename):")
+        for sid, old_name, slug in to_rename:
+            if dry_run:
+                new_name = make_completion_name(slug) or sid[:5]
+                click.echo(f"  {sid[:8]}  {old_name} → {new_name}  [{slug[:50]}]")
+            else:
+                index = do_rename(index, sid, slug, repo_key=rk)
+                click.echo(f"  {sid[:8]}  → {index[sid]['name']}  [{index[sid]['slug'][:50]}]")
+
+        if not dry_run:
+            save_index(rk, index)
+            write_legacy_tsv(rk, index)
+        total += len(to_rename)
+
+    action = "would be" if dry_run else "were"
+    click.echo(f"\n  {total} session(s) {action} renamed." + (" Run without --dry-run to apply." if dry_run and total else ""))
+
+
+# ---------------------------------------------------------------------------
+# Tree command
+# ---------------------------------------------------------------------------
+
+@main.command("tree")
+@click.option("--output", "-o", default="-", metavar="FILE", help="Output file (default: stdout)")
+@click.option("--repo", "repo_label", default="", metavar="LABEL", help="Filter to a specific repo label")
+@click.option("--format", "fmt", type=click.Choice(["yaml", "json"]), default="yaml", show_default=True, help="Output format")
+@click.option("--include-archived", is_flag=True, help="Include archived sessions")
+def tree_cmd(output: str, repo_label: str, fmt: str, include_archived: bool) -> None:
+    """Dump all repos and sessions as a YAML or JSON tree."""
+    import yaml
+    from .config import load
+    from .sessions import load_sessions
+
+    config = load()
+    sessions = load_sessions(config, show_archived=include_archived)
+
+    if repo_label:
+        sessions = [s for s in sessions if s.repo_label == repo_label or s.repo_label.startswith(repo_label + "/")]
+
+    repos_tree: dict = {}
+    for s in sessions:
+        repo = repos_tree.setdefault(s.repo_label, {"path": str(s.repo_path), "sessions": []})
+        entry: dict = {"id": s.id, "name": s.name, "slug": s.slug, "last_active": s.last_active, "profile": s.profile}
+        if s.tags:
+            entry["tags"] = s.tags
+        if s.priority:
+            entry["priority"] = s.priority
+        if s.pinned:
+            entry["pinned"] = True
+        repo["sessions"].append(entry)
+
+    data = {"repos": repos_tree}
+
+    if fmt == "json":
+        text = _json.dumps(data, indent=2)
+    else:
+        text = yaml.dump(data, default_flow_style=False, sort_keys=False, width=120, allow_unicode=True)
+
+    if output == "-":
+        click.echo(text, nl=False)
+    else:
+        Path(output).write_text(text)
+        click.echo(f"Written to {output}")
+
+
 # ---------------------------------------------------------------------------
 # Backwards-compat entrypoint: mirrors old claude-sessions-index CLI
 # Usage: claude-sessions-index <cmd> <repo-key> [args...]
