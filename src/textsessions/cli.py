@@ -864,10 +864,9 @@ def search_cmd(query: str, ai_profile: str, repo_label: str, limit: int, as_json
         f'If nothing matches, return {{"matches": [], "reason": "no relevant sessions found"}}.'
     )
 
-    # ai_search_profile is always used as the full command (no template substitution)
+    # ai_search_profile is a fish function/command — must run via fish -c so fish functions resolve
     ai_cmd = ai_profile or config.ui.ai_search_profile
-
-    cmd = shlex.split(ai_cmd) + ["-p"]
+    cmd = ["fish", "-c", f"{ai_cmd} -p"]
 
     console = Console()
     if capped:
@@ -876,7 +875,7 @@ def search_cmd(query: str, ai_profile: str, repo_label: str, limit: int, as_json
     try:
         result = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=60)
     except FileNotFoundError:
-        click.echo(f"Command not found: {cmd[0]!r}. Set ui.ai_search_profile in config.", err=True)
+        click.echo("fish not found — required to resolve fish functions.", err=True)
         sys.exit(1)
     except subprocess.TimeoutExpired:
         click.echo("Search timed out.", err=True)
