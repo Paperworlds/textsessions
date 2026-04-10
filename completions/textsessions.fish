@@ -17,6 +17,8 @@ complete -c textsessions -f -n "__fish_use_subcommand" -a "scan-ghosts"    -d "S
 complete -c textsessions -f -n "__fish_use_subcommand" -a "sessions"       -d "List sessions"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "reindex"        -d "Rebuild session indexes"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "index"          -d "Build and mutate session indexes"
+complete -c textsessions -f -n "__fish_use_subcommand" -a "rename"         -d "Rename a session"
+complete -c textsessions -f -n "__fish_use_subcommand" -a "tag"            -d "Add or remove tags on a session"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "proxy"          -d "Show proxy stats"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "config"         -d "Show config"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "profile"        -d "Manage profiles"
@@ -65,6 +67,12 @@ complete -c textsessions -n "__fish_seen_subcommand_from tree" -s o -l output   
 complete -c textsessions -n "__fish_seen_subcommand_from tree" -l repo                  -d "Filter to repo label" -r
 complete -c textsessions -n "__fish_seen_subcommand_from tree" -l format                -d "Output format" -xa "yaml json"
 complete -c textsessions -n "__fish_seen_subcommand_from tree" -l include-archived      -d "Include archived sessions"
+
+# rename — first arg is session name
+complete -c textsessions -f -n "__fish_seen_subcommand_from rename" -xa "(textsessions sessions --names-only --limit 200 2>/dev/null)"
+
+# tag — first arg is session name
+complete -c textsessions -f -n "__fish_seen_subcommand_from tag" -xa "(textsessions sessions --names-only --limit 200 2>/dev/null)"
 
 # index auto-rename flags
 complete -c textsessions -n "__fish_seen_subcommand_from index; and __fish_seen_subcommand_from auto-rename" -l dry-run -d "Preview without applying"

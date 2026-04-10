@@ -353,10 +353,8 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
 
     console = Console()
     table = Table(show_header=True, header_style="bold")
-    has_desc = any(s.description for s in filtered)
-    table.add_column("Name" if not has_desc else "Description", style="bold")
-    if has_desc:
-        table.add_column("Name", style="dim")
+    table.add_column("Name", style="bold")
+    table.add_column("Info", style="dim")
     table.add_column("Repo")
     table.add_column("Profile")
     table.add_column("Tags")
@@ -366,12 +364,62 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
     for s in filtered:
         tags_str = " ".join(f"#{t}" for t in s.tags)
         pri = s.display_priority
-        if has_desc:
-            table.add_row(s.description or s.name, s.name if s.description else "", s.repo_label, s.profile, tags_str, pri, s.last_active)
-        else:
-            table.add_row(s.name, s.repo_label, s.profile, tags_str, pri, s.last_active)
+        info = s.description or s.slug
+        table.add_row(s.name, info, s.repo_label, s.profile, tags_str, pri, s.last_active)
 
     console.print(table)
+
+
+def _resolve_session_by_name(name: str, config):
+    """Find a session by name/prefix across all repos. Exits if not found."""
+    sessions = load_sessions(config)
+    matched = [s for s in sessions if s.name == name or s.id.startswith(name) or s.name.startswith(name)]
+    if not matched:
+        click.echo(f"No session matching '{name}'", err=True)
+        sys.exit(1)
+    return matched[0]
+
+
+@main.command("rename")
+@click.argument("name", shell_complete=_complete_session_names)
+@click.argument("new_title", nargs=-1, required=True)
+def rename_cmd(name: str, new_title: tuple[str, ...]) -> None:
+    """Rename a session by name."""
+    from .config import repo_key as _repo_key
+    from .indexer import do_rename, load_index, save_index, write_legacy_tsv
+    title = " ".join(new_title)
+    config = load()
+    s = _resolve_session_by_name(name, config)
+    rk = _repo_key(s.repo_path)
+    index = load_index(rk)
+    index = do_rename(index, s.id, title, repo_key=rk)
+    save_index(rk, index)
+    write_legacy_tsv(rk, index)
+    click.echo(f"  {s.id[:8]}  → {index[s.id]['name']}  [{title}]")
+
+
+@main.command("tag")
+@click.argument("name", shell_complete=_complete_session_names)
+@click.argument("tags_csv")
+def tag_cmd(name: str, tags_csv: str) -> None:
+    """Add or remove tags on a session (prefix with - to remove, e.g. auth,-old)."""
+    from .config import repo_key as _repo_key
+    from .indexer import do_tag, do_untag, load_index, save_index, write_legacy_tsv
+    config = load()
+    s = _resolve_session_by_name(name, config)
+    rk = _repo_key(s.repo_path)
+    index = load_index(rk)
+    parts = [t.strip() for t in tags_csv.split(",") if t.strip()]
+    to_add = [t for t in parts if not t.startswith("-")]
+    to_remove = [t[1:] for t in parts if t.startswith("-")]
+    if to_add:
+        index = do_tag(index, s.id, ",".join(to_add))
+    if to_remove:
+        index = do_untag(index, s.id, ",".join(to_remove))
+    save_index(rk, index)
+    write_legacy_tsv(rk, index)
+    remaining = index[s.id].get("tags", [])
+    click.echo(f"  {s.id[:8]}  tags: {', '.join(remaining) if remaining else '(none)'}")
 
 
 @main.command()
@@ -912,20 +960,16 @@ def search_cmd(query: str, ai_profile: str, repo_label: str, limit: int, as_json
         return
 
     table = Table(show_header=True, header_style="bold")
-    has_desc = any(s.description for s in matched)
-    table.add_column("Description" if has_desc else "Name", style="bold")
-    if has_desc:
-        table.add_column("Name", style="dim")
+    table.add_column("Name", style="bold")
+    table.add_column("Info", style="dim")
     table.add_column("Repo")
     table.add_column("Tags")
     table.add_column("Last Active")
 
     for s in matched:
         tags_str = " ".join(f"#{t}" for t in s.tags)
-        if has_desc:
-            table.add_row(s.description or s.name, s.name if s.description else "", s.repo_label, tags_str, s.last_active)
-        else:
-            table.add_row(s.name, s.repo_label, tags_str, s.last_active)
+        info = s.description or s.slug
+        table.add_row(s.name, info, s.repo_label, tags_str, s.last_active)
 
     console.print(table)
 
