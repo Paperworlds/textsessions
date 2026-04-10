@@ -10,6 +10,8 @@ textsessions
 
 ![TUI showing session list with repo, profile, tags, priority, and last-active columns]
 
+> **Claude Code only.** textsessions is built and tested exclusively with [Claude Code](https://claude.ai/code). It reads the `.jsonl` session files that Claude Code writes to disk and is not compatible with other AI coding assistants.
+
 ---
 
 ## Requirements
@@ -99,11 +101,29 @@ Sessions are grouped by repo and sorted by last-active. The right panel shows fu
 textsessions sessions
 textsessions sessions --repo mono --tag auth --limit 10
 
-# Resume a session by name (fish tab-completion supported)
+# Resume a session by name (tab-completion supported)
 textsessions sessions --resume my-feature-work
 
 # Filter to current folder's repo
 textsessions sessions --current-folder
+```
+
+The table shows: **Name**, **Info** (description if set, otherwise the auto-generated slug), Repo, Profile, Tags, Priority, Last Active.
+
+### Rename and tag
+
+```sh
+# Rename a session (tab-completes session names)
+textsessions rename my-feature-work "Better title for this session"
+
+# Add tags
+textsessions tag my-feature-work auth,api
+
+# Remove tags (prefix with -)
+textsessions tag my-feature-work -auth
+
+# Add and remove in one shot
+textsessions tag my-feature-work api,-old,keep
 ```
 
 ### AI search
@@ -253,9 +273,30 @@ The index stores: session name, profile, last-active timestamp, slug, tags, prio
 
 ---
 
-## Part of PaperWorlds
+## Ask Claude about this tool
 
-textsessions is the first open-source release from [PaperWorlds](https://github.com/pdonorio/paperworlds) — a personal project building tools and games around AI agents and text interfaces.
+If you use Claude Code, you can paste this prompt to get a quick orientation:
+
+```
+Read the file at docs/features.yaml in this repo and tell me:
+1. What textsessions does and who it's for
+2. Which features are most relevant to my workflow (ask me 2-3 questions first)
+3. The first 3 commands I should run to get started
+```
+
+Or for a deeper dive:
+
+```
+Read docs/features.yaml and give me a tour of textsessions.
+For each feature, tell me when I'd use it and show me the exact command.
+Start with the ones that solve the most common pain points for heavy Claude Code users.
+```
+
+---
+
+## Part of Paperworlds
+
+textsessions is part of [Paperworlds](https://github.com/Paperworlds) — an open org building tools and games around AI agents and text interfaces.
 
 ---
 
