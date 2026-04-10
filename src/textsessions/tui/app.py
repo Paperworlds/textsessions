@@ -124,17 +124,17 @@ class TextSessionsApp(ActionsMixin, App):
         height: 1fr;
     }
     #left-panel {
-        width: 60%;
+        width: 70%;
         border: solid $primary;
         padding: 0 1;
     }
     #right-panel {
-        width: 40%;
+        width: 30%;
         border: solid $primary-darken-2;
         padding: 1;
     }
     #filter-input {
-        height: 3;
+        height: 1;
     }
     #scope-label {
         margin-bottom: 1;
@@ -252,10 +252,10 @@ class TextSessionsApp(ActionsMixin, App):
     def _populate_table(self) -> None:
         table = self.query_one("#sessions-table", DataTable)
         table.clear(columns=True)
-        table.add_columns("Name", "Repo", "Profile", "Tags", "Pri", "Last Active")
+        table.add_columns("Name", "Repo", "Profile / Tags", "Pri", "Last Active")
         for s in self._filtered:
             pri = s.display_priority
-            label = s.description if s.description else s.name
+            label = (s.description if s.description else s.name)[:40]
             if s.pinned and self._show_pinned:
                 name_cell = f"[bold cyan]★[/bold cyan] {label}"
             elif s.is_ghost:
@@ -264,11 +264,13 @@ class TextSessionsApp(ActionsMixin, App):
                 name_cell = f"[dim]{label}[/dim]"
             else:
                 name_cell = label
+            tags = [t for t in s.tags if t != "archived"]
+            tags_str = "  " + " ".join(f"[cyan]#{t}[/cyan]" for t in tags) if tags else ""
+            profile_cell = f"{s.profile}{tags_str}"
             table.add_row(
                 name_cell,
                 s.repo_label,
-                s.profile,
-                " ".join(f"#{t}" for t in s.tags if t != "archived"),
+                profile_cell,
                 pri,
                 s.last_active,
                 key=s.id,
