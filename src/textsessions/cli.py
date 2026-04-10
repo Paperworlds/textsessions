@@ -722,13 +722,18 @@ def index_delete(repo_key_arg: str, session_id: str) -> None:
 @click.argument("repo_key_arg", metavar="REPO-KEY", required=False)
 @click.option("--dry-run", is_flag=True, help="Preview changes without applying them")
 def index_auto_rename(repo_key_arg: str | None, dry_run: bool) -> None:
-    """Rename sessions whose name is a raw hex ID, using their slug as the new title.
+    """Rename hex-ID sessions that have a custom title set via /rename.
 
+    Scans .jsonl files for custom-title entries written by Claude's /rename
+    command, and applies them to index entries whose name is still a raw hex ID.
     Omit REPO-KEY to process all configured repos. Ghost sessions are skipped.
     """
+    import glob
+    import json as _json
     import re as _re
+    from pathlib import Path
     from .config import load, repo_key
-    from .indexer import do_rename, load_index, make_completion_name, save_index, write_legacy_tsv
+    from .indexer import do_rename, load_index, save_index, write_legacy_tsv
 
     _HEX = _re.compile(r"^[0-9a-f]{5,8}$")
     config = load()
@@ -740,12 +745,34 @@ def index_auto_rename(repo_key_arg: str | None, dry_run: bool) -> None:
     else:
         repos = [(r, repo_key(r.path)) for r in config.repos]
 
+    def _find_custom_titles(rk: str) -> dict[str, str]:
+        """Scan .jsonl files for custom-title entries. Returns {session_id: title}."""
+        titles: dict[str, str] = {}
+        for claude_dir in sorted(Path.home().glob(".claude*")):
+            if claude_dir.is_symlink() or not claude_dir.is_dir():
+                continue
+            pattern = str(claude_dir / "projects" / rk / "*.jsonl")
+            for path in glob.glob(pattern):
+                sid = Path(path).stem
+                custom_title = ""
+                try:
+                    for line in open(path):
+                        d = _json.loads(line)
+                        if d.get("type") == "custom-title":
+                            custom_title = d.get("customTitle", "")
+                except (OSError, _json.JSONDecodeError):
+                    continue
+                if custom_title:
+                    titles[sid] = custom_title
+        return titles
+
     total = 0
     for repo_cfg, rk in repos:
         index = load_index(rk)
         if not index:
             continue
 
+        custom_titles = _find_custom_titles(rk)
         to_rename = []
         for sid, entry in index.items():
             name = entry.get("name", "")
@@ -753,21 +780,22 @@ def index_auto_rename(repo_key_arg: str | None, dry_run: bool) -> None:
                 continue
             if repo_cfg and not (repo_cfg.path / ".git").exists():
                 continue  # skip ghosts
-            slug = entry.get("slug", "")
-            if not slug:
+            title = custom_titles.get(sid, "")
+            if not title:
                 continue
-            to_rename.append((sid, name, slug))
+            to_rename.append((sid, name, title))
 
         if not to_rename:
             continue
 
         click.echo(f"\n{rk}  ({len(to_rename)} to rename):")
-        for sid, old_name, slug in to_rename:
+        for sid, old_name, title in to_rename:
             if dry_run:
-                new_name = make_completion_name(slug) or sid[:5]
-                click.echo(f"  {sid[:8]}  {old_name} → {new_name}  [{slug[:50]}]")
+                from .indexer import make_completion_name
+                new_name = make_completion_name(title) or sid[:5]
+                click.echo(f"  {sid[:8]}  {old_name} → {new_name}  [{title[:50]}]")
             else:
-                index = do_rename(index, sid, slug, repo_key=rk)
+                index = do_rename(index, sid, title)  # repo_key omitted: title already in .jsonl
                 click.echo(f"  {sid[:8]}  → {index[sid]['name']}  [{index[sid]['slug'][:50]}]")
 
         if not dry_run:
