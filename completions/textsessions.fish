@@ -20,6 +20,7 @@ complete -c textsessions -f -n "__fish_use_subcommand" -a "index"          -d "B
 complete -c textsessions -f -n "__fish_use_subcommand" -a "proxy"          -d "Show proxy stats"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "config"         -d "Show config"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "profile"        -d "Manage profiles"
+complete -c textsessions -f -n "__fish_use_subcommand" -a "search"         -d "Search sessions using natural language (AI-powered)"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "tree"           -d "Dump repos and sessions as YAML/JSON tree"
 
 # reindex flags
@@ -52,6 +53,12 @@ complete -c textsessions -n "__fish_seen_subcommand_from sessions" -l profile  -
 complete -c textsessions -n "__fish_seen_subcommand_from sessions" -l priority -d "Sort by priority"
 complete -c textsessions -n "__fish_seen_subcommand_from sessions" -l limit    -d "Max results" -r
 complete -c textsessions -n "__fish_seen_subcommand_from sessions" -l resume   -d "Resume session by name" -xa "(textsessions sessions --names-only --limit 200 2>/dev/null)"
+
+# search flags
+complete -c textsessions -n "__fish_seen_subcommand_from search" -l profile         -d "Override AI command/profile" -r
+complete -c textsessions -n "__fish_seen_subcommand_from search" -l repo             -d "Limit to repo label" -r
+complete -c textsessions -n "__fish_seen_subcommand_from search" -l limit            -d "Max results" -r
+complete -c textsessions -n "__fish_seen_subcommand_from search" -l json             -d "Output as JSON"
 
 # tree flags
 complete -c textsessions -n "__fish_seen_subcommand_from tree" -s o -l output          -d "Output file" -r

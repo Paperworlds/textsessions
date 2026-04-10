@@ -42,8 +42,9 @@ class IntegrationsConfig:
 
 @dataclass
 class UiConfig:
-    startup_repo: str = "current"  # "current" | "all"
-    claude_cmd: str = "claude"     # command to run; {profile} is substituted if present
+    startup_repo: str = "current"       # "current" | "all"
+    claude_cmd: str = "claude"          # command to run; {profile} is substituted if present
+    ai_search_profile: str = "claude-personal"  # claude command/profile used for `textsessions search`
 
 
 @dataclass
@@ -82,6 +83,7 @@ def load() -> Config:
     ui = UiConfig(
         startup_repo=ui_data.get("startup_repo", "current"),
         claude_cmd=ui_data.get("claude_cmd", "claude"),
+        ai_search_profile=ui_data.get("ai_search_profile", "claude-personal"),
     )
     return Config(repos=repos, proxy=proxy, integrations=integrations, ui=ui)
 

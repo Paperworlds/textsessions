@@ -814,6 +814,129 @@ def index_auto_rename(repo_key_arg: str | None, dry_run: bool) -> None:
 
 
 # ---------------------------------------------------------------------------
+# AI search command
+# ---------------------------------------------------------------------------
+
+@main.command("search")
+@click.argument("query")
+@click.option("--profile", "ai_profile", default="", metavar="CMD", help="Override AI command/profile from config")
+@click.option("--repo", "repo_label", default="", metavar="LABEL", help="Limit search to a repo")
+@click.option("--limit", default=10, show_default=True, metavar="N", help="Max results")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def search_cmd(query: str, ai_profile: str, repo_label: str, limit: int, as_json: bool) -> None:
+    """Search past sessions using natural language (powered by Claude).
+
+    Sends session metadata to Claude and asks it to find relevant sessions.
+    The Claude command used is configured via ui.ai_search_profile (default: claude-personal).
+    """
+    import re
+    import shlex
+    import subprocess
+
+    config = load()
+
+    all_sessions = load_sessions(config)
+    if repo_label:
+        all_sessions = filter_sessions(all_sessions, repo_label=repo_label)
+
+    if not all_sessions:
+        click.echo("No sessions to search.")
+        return
+
+    # Cap to keep prompt size reasonable
+    MAX_SESSIONS = 500
+    capped = len(all_sessions) > MAX_SESSIONS
+    sessions_to_search = all_sessions[:MAX_SESSIONS]
+
+    # Build compact session lines for the prompt
+    prompt_lines = []
+    for s in sessions_to_search:
+        label = s.description or s.slug
+        tags = f" [{','.join(s.tags)}]" if s.tags else ""
+        prompt_lines.append(f"{s.short_id}  {s.repo_label}/{s.name}  {label[:100]}{tags}")
+
+    prompt = (
+        f"Search Claude Code session history for: {query}\n\n"
+        f"Sessions (short_id  repo/name  description [tags]):\n"
+        + "\n".join(prompt_lines)
+        + f'\n\nReply with ONLY valid JSON: {{"matches": ["id1", "id2", ...], "reason": "brief explanation"}}\n'
+        f"List the short_ids of relevant sessions, most relevant first, at most {limit}.\n"
+        f'If nothing matches, return {{"matches": [], "reason": "no relevant sessions found"}}.'
+    )
+
+    # Derive the command to use
+    raw = ai_profile or config.ui.ai_search_profile  # e.g. "claude-personal" or "personal"
+    tpl = config.ui.claude_cmd
+    if "{profile}" in tpl:
+        ai_cmd = tpl.format(profile=raw)
+    else:
+        ai_cmd = raw  # treat as full command name
+
+    cmd = shlex.split(ai_cmd) + ["-p"]
+
+    console = Console()
+    if capped:
+        console.print(f"[dim]  (searching {MAX_SESSIONS} of {len(all_sessions)} sessions)[/dim]", highlight=False)
+
+    try:
+        result = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=60)
+    except FileNotFoundError:
+        click.echo(f"Command not found: {cmd[0]!r}. Set ui.ai_search_profile in config.", err=True)
+        sys.exit(1)
+    except subprocess.TimeoutExpired:
+        click.echo("Search timed out.", err=True)
+        sys.exit(1)
+
+    if result.returncode != 0:
+        click.echo(f"Search failed:\n{result.stderr or result.stdout}", err=True)
+        sys.exit(1)
+
+    # Extract JSON from the response (Claude may wrap it in prose)
+    output = result.stdout.strip()
+    m = re.search(r'\{.*?"matches".*?\}', output, re.DOTALL)
+    if not m:
+        click.echo(f"Could not parse response:\n{output}", err=True)
+        sys.exit(1)
+
+    data = _json.loads(m.group())
+    matched_ids: list[str] = data.get("matches", [])
+    reason: str = data.get("reason", "")
+
+    sid_map = {s.short_id: s for s in sessions_to_search}
+    matched = [sid_map[sid] for sid in matched_ids if sid in sid_map]
+
+    if reason:
+        console.print(f"[dim]{reason}[/dim]\n", highlight=False)
+
+    if not matched:
+        click.echo("No matching sessions found.")
+        return
+
+    if as_json:
+        out = [{"id": s.id, "name": s.name, "description": s.description or s.slug, "repo": s.repo_label, "last_active": s.last_active} for s in matched]
+        click.echo(_json.dumps(out, indent=2))
+        return
+
+    table = Table(show_header=True, header_style="bold")
+    has_desc = any(s.description for s in matched)
+    table.add_column("Description" if has_desc else "Name", style="bold")
+    if has_desc:
+        table.add_column("Name", style="dim")
+    table.add_column("Repo")
+    table.add_column("Tags")
+    table.add_column("Last Active")
+
+    for s in matched:
+        tags_str = " ".join(f"#{t}" for t in s.tags)
+        if has_desc:
+            table.add_row(s.description or s.name, s.name if s.description else "", s.repo_label, tags_str, s.last_active)
+        else:
+            table.add_row(s.name, s.repo_label, tags_str, s.last_active)
+
+    console.print(table)
+
+
+# ---------------------------------------------------------------------------
 # Tree command
 # ---------------------------------------------------------------------------
 
