@@ -31,6 +31,7 @@ class Session:
     repo_label: str = ""
     repo_path: Path = field(default_factory=Path)
     pinned: bool = False
+    description: str = ""
 
     @property
     def priority_order(self) -> int:
@@ -91,6 +92,7 @@ def _sessions_from_index(yaml_path: Path, repo_label: str, repo_path: Path) -> l
             repo_label=repo_label,
             repo_path=repo_path,
             pinned=bool(entry.get("pinned", False)),
+            description=entry.get("description", ""),
         ))
     return sessions
 
@@ -216,7 +218,7 @@ def filter_sessions(
         result = [s for s in result if s.is_ghost or s.is_orphan]
     if query:
         q = query.lower()
-        result = [s for s in result if q in s.slug.lower() or q in s.name.lower()]
+        result = [s for s in result if q in s.slug.lower() or q in s.name.lower() or q in s.description.lower()]
     if tag:
         result = [s for s in result if tag in s.tags]
     if profile:

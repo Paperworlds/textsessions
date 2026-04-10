@@ -56,6 +56,13 @@ def make_completion_name(s: str) -> str:
     return s
 
 
+def make_short_name(s: str, max_words: int = 4) -> str:
+    """Shorten a completion name to the first N hyphen-separated words."""
+    name = make_completion_name(s)
+    parts = [p for p in name.split("-") if p]
+    return "-".join(parts[:max_words]) or name[:8]
+
+
 # ---------------------------------------------------------------------------
 # Index persistence
 # ---------------------------------------------------------------------------
@@ -205,7 +212,7 @@ def build_index(repo_key: str, pairs: list[str]) -> dict:
         else:
             slug = make_slug(combined, 60)
 
-        name = make_completion_name(ct) if ct else sid[:5]
+        name = make_short_name(ct) if ct else sid[:5]
         if not name:
             continue
 
@@ -214,8 +221,10 @@ def build_index(repo_key: str, pairs: list[str]) -> dict:
 
         old = old_index.get(sid, {})
         entry: dict = {"name": name, "profile": prof, "last_active": last_dt, "slug": slug}
+        if ct:
+            entry["description"] = ct  # auto-set from custom_title; user-set description takes precedence below
 
-        for field in ("priority", "tags", "pinned", "archived", "name"):
+        for field in ("priority", "tags", "pinned", "archived", "name", "description"):
             if old.get(field):
                 entry[field] = old[field]
 
@@ -304,15 +313,16 @@ def do_priority(index: dict, sid: str, level: str) -> dict:
 
 
 def do_rename(index: dict, sid: str, new_title: str, repo_key: str | None = None) -> dict:
-    """Rename a session (update slug/name). Optionally appends custom-title to .jsonl.
+    """Rename a session: sets description (full label) and a short name for tab-completion.
 
     If repo_key is provided, attempts to append a custom-title entry to the
     .jsonl file so the rename survives a full index rebuild.
     Returns the (mutated) index.
     """
     entry = index[sid]
+    entry["description"] = new_title.strip()
     entry["slug"] = make_slug(new_title, 60)
-    entry["name"] = make_completion_name(new_title) or sid[:5]
+    entry["name"] = make_short_name(new_title) or sid[:5]
 
     if repo_key is not None:
         # Try to find the .jsonl across all profiles and append custom-title

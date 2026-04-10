@@ -70,16 +70,17 @@ class SessionDetail(Static):
         pri_str = f"[bold red]{pri}[/bold red]" if pri.startswith("H") else (f"[yellow]{pri}[/yellow]" if pri else "[dim]—[/dim]")
         tags_str = "  ".join(f"[cyan]#{t}[/cyan]" for t in s.tags) if s.tags else "[dim](none)[/dim]"
 
-        slug_lines = []
-        slug = s.slug
-        while len(slug) > 50:
-            slug_lines.append(slug[:50])
-            slug = slug[50:]
-        slug_lines.append(slug)
-        slug_display = "\n           ".join(slug_lines)
+        detail_text = s.description or s.slug
+        detail_lines = []
+        while len(detail_text) > 50:
+            detail_lines.append(detail_text[:50])
+            detail_text = detail_text[50:]
+        detail_lines.append(detail_text)
+        detail_display = "\n           ".join(detail_lines)
+        detail_label = "Desc:" if s.description else "Slug:"
 
         lines = [
-            f"[bold]Name:[/bold]    {s.name}",
+            f"[bold]Name:[/bold]    [dim]{s.name}[/dim]",
             f"[bold]Repo:[/bold]    {s.repo_label}",
             f"[bold]Profile:[/bold] {s.profile}",
             f"[bold]Tags:[/bold]    {tags_str}",
@@ -87,7 +88,7 @@ class SessionDetail(Static):
             f"[bold]Active:[/bold]  {s.last_active}",
             f"[bold]ID:[/bold]      [dim]{s.id}[/dim]",
             "",
-            f"[bold]Slug:[/bold]    [dim]{slug_display}[/dim]",
+            f"[bold]{detail_label}[/bold]    [dim]{detail_display}[/dim]",
             "",
             "─" * 40,
             "[bold]Token Proxy (current session)[/bold]",
@@ -253,14 +254,15 @@ class TextSessionsApp(ActionsMixin, App):
         table.add_columns("Name", "Repo", "Profile", "Tags", "Pri", "Last Active")
         for s in self._filtered:
             pri = s.display_priority
+            label = s.description if s.description else s.name
             if s.pinned:
-                name_cell = f"[bold cyan]★[/bold cyan] {s.name}"
+                name_cell = f"[bold cyan]★[/bold cyan] {label}"
             elif s.is_ghost:
-                name_cell = f"[dim]~{s.name}[/dim]"
+                name_cell = f"[dim]~{label}[/dim]"
             elif s.is_orphan:
-                name_cell = f"[dim]{s.name}[/dim]"
+                name_cell = f"[dim]{label}[/dim]"
             else:
-                name_cell = s.name
+                name_cell = label
             table.add_row(
                 name_cell,
                 s.repo_label,

@@ -353,7 +353,10 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
 
     console = Console()
     table = Table(show_header=True, header_style="bold")
-    table.add_column("Name", style="bold")
+    has_desc = any(s.description for s in filtered)
+    table.add_column("Name" if not has_desc else "Description", style="bold")
+    if has_desc:
+        table.add_column("Name", style="dim")
     table.add_column("Repo")
     table.add_column("Profile")
     table.add_column("Tags")
@@ -363,7 +366,10 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
     for s in filtered:
         tags_str = " ".join(f"#{t}" for t in s.tags)
         pri = s.display_priority
-        table.add_row(s.name, s.repo_label, s.profile, tags_str, pri, s.last_active)
+        if has_desc:
+            table.add_row(s.description or s.name, s.name if s.description else "", s.repo_label, s.profile, tags_str, pri, s.last_active)
+        else:
+            table.add_row(s.name, s.repo_label, s.profile, tags_str, pri, s.last_active)
 
     console.print(table)
 
@@ -791,12 +797,12 @@ def index_auto_rename(repo_key_arg: str | None, dry_run: bool) -> None:
         click.echo(f"\n{rk}  ({len(to_rename)} to rename):")
         for sid, old_name, title in to_rename:
             if dry_run:
-                from .indexer import make_completion_name
-                new_name = make_completion_name(title) or sid[:5]
+                from .indexer import make_short_name
+                new_name = make_short_name(title) or sid[:5]
                 click.echo(f"  {sid[:8]}  {old_name} → {new_name}  [{title[:50]}]")
             else:
                 index = do_rename(index, sid, title)  # repo_key omitted: title already in .jsonl
-                click.echo(f"  {sid[:8]}  → {index[sid]['name']}  [{index[sid]['slug'][:50]}]")
+                click.echo(f"  {sid[:8]}  → {index[sid]['name']}  [{index[sid].get('description', '')[:50]}]")
 
         if not dry_run:
             save_index(rk, index)
