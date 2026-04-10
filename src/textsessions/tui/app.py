@@ -274,7 +274,7 @@ class TextSessionsApp(ActionsMixin, App):
             profile_cell = f"{s.profile}{tags_str}"
             row = [name_cell]
             if not single_repo:
-                row.append(s.repo_label)
+                row.append(s.repo_label[:15])
             row += [profile_cell, pri, s.last_active]
             table.add_row(*row, key=s.id)
         # Re-select first row if available
