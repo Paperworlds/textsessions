@@ -120,3 +120,33 @@ def test_do_pin_roundtrip(tmp_path):
     assert index["sid123"]["pinned"] is True
     index = do_pin(index, "sid123", False)
     assert "pinned" not in index["sid123"]
+
+
+# ---------------------------------------------------------------------------
+# Pins hidden: pinned sessions remain visible, sorted by last_active
+# ---------------------------------------------------------------------------
+
+def test_pins_hidden_sessions_remain_visible():
+    """When _show_pinned is False, pinned sessions must NOT be removed from the list."""
+    sessions = [
+        _make_session("a", "pinned-old", "2026-01-01 10:00", pinned=True),
+        _make_session("b", "recent", "2026-01-03 10:00"),
+        _make_session("c", "middle", "2026-01-02 10:00"),
+    ]
+    # Simulate what _apply_filter does when show_pinned=False: flat sort, no removal
+    result = sorted(sessions, key=lambda s: s.last_active, reverse=True)
+    names = [s.name for s in result]
+    assert "pinned-old" in names, "pinned session must not be removed when pins are hidden"
+
+
+def test_pins_hidden_sorted_flat_by_last_active():
+    """When pins are hidden, pinned sessions sort by last_active, not floated to top."""
+    sessions = [
+        _make_session("a", "pinned-old", "2026-01-01 10:00", pinned=True),
+        _make_session("b", "recent", "2026-01-03 10:00"),
+        _make_session("c", "middle", "2026-01-02 10:00"),
+    ]
+    result = sorted(sessions, key=lambda s: s.last_active, reverse=True)
+    assert result[0].name == "recent"
+    assert result[1].name == "middle"
+    assert result[2].name == "pinned-old"

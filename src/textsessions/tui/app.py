@@ -243,10 +243,11 @@ class TextSessionsApp(ActionsMixin, App):
             repo_label=self._repo_filter,
             ghosts_only=self._ghosts_only,
         )
-        if not self._show_pinned:
-            self._filtered = [s for s in self._filtered if not s.pinned]
         if self._sort_by_priority:
             self._filtered = sort_by_priority(self._filtered)
+        elif not self._show_pinned:
+            # Pins hidden: sort all sessions flat by last_active, ignoring pinned flag
+            self._filtered = sorted(self._filtered, key=lambda s: s.last_active, reverse=True)
 
     def _populate_table(self) -> None:
         table = self.query_one("#sessions-table", DataTable)
@@ -255,7 +256,7 @@ class TextSessionsApp(ActionsMixin, App):
         for s in self._filtered:
             pri = s.display_priority
             label = s.description if s.description else s.name
-            if s.pinned:
+            if s.pinned and self._show_pinned:
                 name_cell = f"[bold cyan]★[/bold cyan] {label}"
             elif s.is_ghost:
                 name_cell = f"[dim]~{label}[/dim]"
