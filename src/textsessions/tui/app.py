@@ -260,7 +260,7 @@ class TextSessionsApp(ActionsMixin, App):
         table.add_columns(*cols)
         for s in self._filtered:
             pri = s.display_priority
-            label = (s.description if s.description else s.name)[:40]
+            label = (s.description if s.description else s.name)[:35]
             if s.pinned and self._show_pinned:
                 name_cell = f"[bold cyan]★[/bold cyan] {label}"
             elif s.is_ghost:
