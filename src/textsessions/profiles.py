@@ -1,6 +1,6 @@
 """Profile and integration detection helpers for textsessions.
 
-Detects cloak (https://github.com/synth1s/cloak) and ai-proxy at runtime.
+Detects textaccounts and ai-proxy at runtime.
 Never auto-installs anything — only detects and guides.
 """
 
@@ -9,44 +9,51 @@ from __future__ import annotations
 import os
 import shutil
 import socket
-import subprocess
 from pathlib import Path
 
-
-def cloak_available() -> bool:
-    """True if cloak is installed (binary on PATH)."""
-    return shutil.which("cloak") is not None
+_TEXTACCOUNTS_CONFIG = Path.home() / ".textaccounts" / "profiles.yaml"
 
 
-def cloak_profile_dir(profile: str) -> Path | None:
-    """Return ~/.cloak/profiles/<profile> if it exists, else None."""
-    d = Path.home() / ".cloak" / "profiles" / profile
-    return d if d.exists() else None
+def _textaccounts_config_path() -> Path:
+    """Return the textaccounts config path (overridable in tests via module attr)."""
+    return _TEXTACCOUNTS_CONFIG
 
 
-def list_cloak_profiles() -> list[str]:
-    """Return sorted list of profile names found in ~/.cloak/profiles/."""
-    base = Path.home() / ".cloak" / "profiles"
-    if not base.exists():
-        return []
-    return sorted(p.name for p in base.iterdir() if p.is_dir())
+def textaccounts_available() -> bool:
+    """True if ~/.textaccounts/profiles.yaml exists."""
+    return _textaccounts_config_path().exists()
 
 
-def cloak_version() -> str | None:
-    """Return cloak version string, or None if unavailable."""
-    if not cloak_available():
+def textaccounts_profile_dir(profile: str) -> Path | None:
+    """Return the path for the named profile from ~/.textaccounts/profiles.yaml, or None."""
+    config_path = _textaccounts_config_path()
+    if not config_path.exists():
         return None
     try:
-        result = subprocess.run(
-            ["cloak", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=3,
-        )
-        line = (result.stdout or result.stderr).strip().splitlines()[0]
-        return line if line else None
+        import yaml
+        with config_path.open() as f:
+            data = yaml.safe_load(f) or {}
+        entry = (data.get("profiles") or {}).get(profile)
+        if entry is None:
+            return None
+        p = Path(entry["path"])
+        return p if p.exists() else p  # return even if not yet created
     except Exception:
         return None
+
+
+def list_textaccounts_profiles() -> list[str]:
+    """Return profile names from ~/.textaccounts/profiles.yaml."""
+    config_path = _textaccounts_config_path()
+    if not config_path.exists():
+        return []
+    try:
+        import yaml
+        with config_path.open() as f:
+            data = yaml.safe_load(f) or {}
+        return sorted((data.get("profiles") or {}).keys())
+    except Exception:
+        return []
 
 
 def aiproxy_available() -> bool:
@@ -70,7 +77,7 @@ def resume_cmd(session_id: str, session_name: str, profile: str, env: dict[str, 
     Always returns a fish command so that fish functions are available.
 
     claude_cmd_tpl: command template from config (e.g. "claude" or "claude-{profile}").
-    {profile} is substituted with the session profile. CLAUDE_CONFIG_DIR (cloak) takes
+    {profile} is substituted with the session profile. CLAUDE_CONFIG_DIR takes
     precedence and always uses plain "claude".
     """
     import shlex
@@ -92,11 +99,11 @@ def resume_cmd(session_id: str, session_name: str, profile: str, env: dict[str, 
 
 
 def build_launch_env(profile: str, integrations_enabled: dict[str, bool]) -> dict[str, str]:
-    """Build subprocess env dict with cloak and ai-proxy integrations applied.
+    """Build subprocess env dict with textaccounts and ai-proxy integrations applied.
 
     Args:
         profile: The profile name from repo config.
-        integrations_enabled: Dict with 'cloak' and 'aiproxy' bool values
+        integrations_enabled: Dict with 'textaccounts' and 'aiproxy' bool values
                               (from IntegrationsConfig).
 
     Returns:
@@ -104,11 +111,11 @@ def build_launch_env(profile: str, integrations_enabled: dict[str, bool]) -> dic
     """
     env = os.environ.copy()
 
-    # Cloak: set CLAUDE_CONFIG_DIR when profile is non-default and cloak is
-    # available and the profile dir exists.
-    if integrations_enabled.get("cloak", True) and profile != "default":
-        if cloak_available():
-            d = cloak_profile_dir(profile)
+    # textaccounts: set CLAUDE_CONFIG_DIR when textaccounts is available and
+    # the profile is registered.
+    if integrations_enabled.get("textaccounts", True):
+        if textaccounts_available():
+            d = textaccounts_profile_dir(profile)
             if d is not None:
                 env["CLAUDE_CONFIG_DIR"] = str(d)
 

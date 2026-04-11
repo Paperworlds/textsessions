@@ -36,8 +36,8 @@ class ProxyConfig:
 @dataclass
 class IntegrationsConfig:
     """Integration toggles. True means 'use if available' (auto-detected at runtime)."""
-    cloak: bool = True    # set False to disable cloak even if installed
-    aiproxy: bool = True  # set False to disable ai-proxy even if running
+    textaccounts: bool = True  # set False to disable textaccounts even if configured
+    aiproxy: bool = True       # set False to disable ai-proxy even if running
 
 
 @dataclass
@@ -76,7 +76,7 @@ def load() -> Config:
     )
     integrations_data = data.get("integrations", {})
     integrations = IntegrationsConfig(
-        cloak=integrations_data.get("cloak", True),
+        textaccounts=integrations_data.get("textaccounts", True),
         aiproxy=integrations_data.get("aiproxy", True),
     )
     ui_data = data.get("ui", {})
@@ -105,7 +105,7 @@ def save(config: Config) -> None:
             "cache_dir": str(config.proxy.cache_dir),
         },
         "integrations": {
-            "cloak": config.integrations.cloak,
+            "textaccounts": config.integrations.textaccounts,
             "aiproxy": config.integrations.aiproxy,
         },
         "ui": {
