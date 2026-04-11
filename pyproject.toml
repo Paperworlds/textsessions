@@ -19,6 +19,7 @@ dependencies = [
 [project.scripts]
 textsessions = "textsessions.cli:main"
 claude-sessions-index = "textsessions.cli:sessions_index_compat"
+textaccounts = "textaccounts.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/textsessions", "src/textaccounts"]
