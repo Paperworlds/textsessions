@@ -21,7 +21,7 @@ textsessions
 - Claude Code CLI (`claude`)
 
 Optional integrations (auto-detected at runtime):
-- [cloak](https://github.com/synth1s/cloak) — credential isolation per profile *(experimental — see note below)*
+- [textaccounts](#textaccounts) — native profile isolation (bundled in this repo)
 - [ai-proxy](https://github.com/pdonorio/claude-code-proxy) — local token proxy for usage tracking
 
 ---
@@ -206,7 +206,7 @@ textsessions config   # show current config path and repo list
 [[repos]]
 path = "/Users/you/projects/myrepo"
 label = "myrepo"
-profile = "default"          # maps to a cloak profile (optional)
+profile = "default"          # maps to a textaccounts profile (optional)
 
 [[repos]]
 path = "/Users/you/projects"
@@ -221,8 +221,8 @@ claude_cmd = "claude"        # command to launch Claude; {profile} is substitute
 ai_search_profile = "claude" # command used for `textsessions search`
 
 [integrations]
-cloak = true    # use cloak for credential isolation if installed (see below)
-aiproxy = true  # inject ANTHROPIC_BASE_URL if ai-proxy is running on :7474
+textaccounts = true  # use textaccounts for profile isolation if configured (see below)
+aiproxy = true       # inject ANTHROPIC_BASE_URL if ai-proxy is running on :7474
 
 [proxy]
 cache_dir = "~/.cache/ai-proxy"
@@ -238,7 +238,7 @@ claude_cmd = "claude-{profile}"
 # blog (profile=default) → runs: claude-default
 ```
 
-This lets you define fish functions (`claude-work`, `claude-personal`, etc.) that set environment or flags before calling `claude`. Useful for routing to different API keys or base URLs without cloak.
+This lets you define fish functions (`claude-work`, `claude-personal`, etc.) that set environment or flags before calling `claude`. Useful for routing to different API keys or base URLs without textaccounts, or alongside it.
 
 ---
 
@@ -248,20 +248,58 @@ This lets you define fish functions (`claude-work`, `claude-personal`, etc.) tha
 
 If [ai-proxy](https://github.com/pdonorio/claude-code-proxy) is running on `localhost:7474`, textsessions automatically sets `ANTHROPIC_BASE_URL` before launching Claude. Token usage and cost appear in the TUI detail panel and `textsessions proxy`.
 
-### cloak *(experimental)*
+### textaccounts
 
-[cloak](https://github.com/synth1s/cloak) isolates Claude accounts by storing each profile's config in a separate directory. textsessions injects `CLAUDE_CONFIG_DIR=~/.cloak/profiles/<profile>` when launching sessions.
+textaccounts is a native profile manager bundled with this repo (`src/textaccounts/`). It isolates Claude accounts by pointing `CLAUDE_CONFIG_DIR` at full config directories — keeping sessions, memory, and auth separate per profile.
 
-> **Note:** cloak integration has not been thoroughly tested. The setup flow is documented in [`docs/cloak-setup.md`](docs/cloak-setup.md) but should be considered experimental. Feedback welcome.
+When textaccounts is configured, textsessions automatically injects `CLAUDE_CONFIG_DIR` before launching or resuming any session whose repo `profile` matches a registered profile name.
+
+#### Setup flow
+
+**1. Install** (included automatically when you `pip install textsessions`):
 
 ```sh
-textsessions profile status   # check cloak and ai-proxy state
-textsessions profile list     # profiles → repos mapping
-textsessions profile check    # verify all configured profiles have cloak dirs
-textsessions profile setup work
+# Install fish completions + the ta wrapper function
+cp completions/ta.fish ~/.config/fish/completions/
 ```
 
-Set `cloak = false` under `[integrations]` to disable entirely.
+**2. Register your existing Claude config dirs** — nothing moves, just registers the paths:
+
+```sh
+textaccounts adopt work ~/.claude-work
+textaccounts adopt personal ~/.claude-personal
+```
+
+**3. Switch profiles** — the `ta` wrapper evals the env line so your shell picks it up:
+
+```sh
+ta switch work       # sets CLAUDE_CONFIG_DIR=~/.claude-work in your shell
+ta switch personal   # sets CLAUDE_CONFIG_DIR=~/.claude-personal
+ta switch default    # unsets CLAUDE_CONFIG_DIR (back to ~/.claude)
+```
+
+**4. Wire repos to profiles** in your config:
+
+```toml
+[[repos]]
+path = "/Users/you/work/myrepo"
+label = "myrepo"
+profile = "work"        # textsessions will inject CLAUDE_CONFIG_DIR for this profile
+```
+
+#### All commands
+
+```sh
+textaccounts list                        # show all profiles with path, email, session count, size
+textaccounts status                      # active profile, env var sync check, session count
+textaccounts adopt <name> <path>         # register an existing dir
+textaccounts create <name>               # snapshot current config dir into ~/.textaccounts/profiles/
+textaccounts create <name> --worker \
+  --from <parent>                        # minimal copy: .claude.json + settings.json only
+textaccounts switch <name>               # print fish env line (use via: ta switch <name>)
+```
+
+Set `textaccounts = false` under `[integrations]` to disable profile injection entirely.
 
 ---
 
