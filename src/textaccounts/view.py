@@ -67,6 +67,8 @@ def _render_detail(profile: dict | None, suggestion: Path | None) -> str:
     if profile["exists"]:
         lines.append(f"Sessions: {profile['sessions']}")
         lines.append(f"Size:     {_fmt_size(profile['dir_size'])}")
+    if profile.get("aliases"):
+        lines.append(f"Aliases:  {', '.join(profile['aliases'])}")
     if profile["worker"]:
         lines.append("[dim]worker (auth-only copy)[/dim]")
     return "\n".join(lines)
@@ -115,6 +117,74 @@ class AdoptModal(ModalScreen["tuple[str, str] | None"]):
         self.dismiss((name, path) if name and path else None)
 
 
+class AliasModal(ModalScreen["str | None"]):
+    """Modal to edit aliases (comma-separated)."""
+    BINDINGS = [Binding("escape", "dismiss(None)", "Cancel")]
+
+    def __init__(self, profile_name: str, current_aliases: list[str]) -> None:
+        super().__init__()
+        self._profile_name = profile_name
+        self._current = ", ".join(current_aliases)
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="dialog"):
+            yield Label(f"[bold]Aliases for {self._profile_name}[/bold]", id="title")
+            yield Label("Comma-separated aliases (leave empty to clear):")
+            yield Input(value=self._current, id="alias-input")
+            with Horizontal(id="buttons"):
+                yield Button("Save", variant="primary", id="save-btn")
+                yield Button("Cancel", id="cancel-btn")
+
+    def on_mount(self) -> None:
+        self.query_one("#alias-input", Input).focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "save-btn":
+            self._submit()
+        else:
+            self.dismiss(None)
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self._submit()
+
+    def _submit(self) -> None:
+        self.dismiss(self.query_one("#alias-input", Input).value)
+
+
+class RenameModal(ModalScreen["str | None"]):
+    """Modal to rename a profile."""
+    BINDINGS = [Binding("escape", "dismiss(None)", "Cancel")]
+
+    def __init__(self, current_name: str) -> None:
+        super().__init__()
+        self._current_name = current_name
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="dialog"):
+            yield Label(f"[bold]Rename {self._current_name}[/bold]", id="title")
+            yield Label("New name:")
+            yield Input(value=self._current_name, id="rename-input")
+            with Horizontal(id="buttons"):
+                yield Button("Rename", variant="primary", id="rename-btn")
+                yield Button("Cancel", id="cancel-btn")
+
+    def on_mount(self) -> None:
+        self.query_one("#rename-input", Input).focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "rename-btn":
+            self._submit()
+        else:
+            self.dismiss(None)
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self._submit()
+
+    def _submit(self) -> None:
+        value = self.query_one("#rename-input", Input).value.strip()
+        self.dismiss(value if value else None)
+
+
 class TextAccountsApp(App):
     CSS = """
     Screen { layout: horizontal; }
@@ -127,15 +197,15 @@ class TextAccountsApp(App):
         padding: 1 2;
         border: solid $surface;
     }
-    AdoptModal #dialog {
+    AdoptModal #dialog, AliasModal #dialog, RenameModal #dialog {
         width: 60;
         padding: 1 2;
         background: $surface;
         border: solid $primary;
         margin: 4 8;
     }
-    AdoptModal #title { margin-bottom: 1; }
-    AdoptModal #buttons { margin-top: 1; align-horizontal: right; }
+    AdoptModal #title, AliasModal #title, RenameModal #title { margin-bottom: 1; }
+    AdoptModal #buttons, AliasModal #buttons, RenameModal #buttons { margin-top: 1; align-horizontal: right; }
     """
 
     TITLE = "textaccounts"
@@ -143,6 +213,8 @@ class TextAccountsApp(App):
     BINDINGS = [
         Binding("s", "switch_profile", "Switch"),
         Binding("a", "adopt", "Adopt"),
+        Binding("l", "edit_aliases", "Aliases"),
+        Binding("r", "rename_profile", "Rename"),
         Binding("q", "quit", "Quit"),
     ]
 
@@ -235,10 +307,10 @@ class TextAccountsApp(App):
         name = profile["name"]
         try:
             registry = load_registry(self._config_path)
-            core.switch(name, registry)
+            core.show(name, registry)
             save_registry(registry, self._config_path)
             self._refresh()
-            self.notify(f"Active: {name} — run: ta switch {name}", timeout=6)
+            self.notify(f"Active: {name} — run: textaccounts switch {name}", timeout=6)
         except Exception as e:
             self.notify(str(e), severity="error")
 
@@ -265,3 +337,46 @@ class TextAccountsApp(App):
                 self.notify(str(e), severity="error")
 
         self.push_screen(AdoptModal(name_hint=name_hint, path_hint=path_hint), handle)
+
+    def action_edit_aliases(self) -> None:
+        profile = self._selected_profile()
+        if profile is None:
+            return
+
+        def handle(result: str | None) -> None:
+            if result is None:
+                return
+            new_aliases = [a.strip() for a in result.split(",") if a.strip()]
+            try:
+                registry = load_registry(self._config_path)
+                p = registry.profiles.get(profile["name"])
+                if p:
+                    p.aliases = new_aliases
+                    save_registry(registry, self._config_path)
+                    self._refresh()
+                    self.notify(f"Aliases updated for {profile['name']}")
+            except Exception as e:
+                self.notify(str(e), severity="error")
+
+        self.push_screen(
+            AliasModal(profile["name"], profile.get("aliases", [])), handle
+        )
+
+    def action_rename_profile(self) -> None:
+        profile = self._selected_profile()
+        if profile is None:
+            return
+
+        def handle(result: str | None) -> None:
+            if result is None or result == profile["name"]:
+                return
+            try:
+                registry = load_registry(self._config_path)
+                core.rename(profile["name"], result, registry)
+                save_registry(registry, self._config_path)
+                self._refresh()
+                self.notify(f"Renamed: {profile['name']} → {result}")
+            except Exception as e:
+                self.notify(str(e), severity="error")
+
+        self.push_screen(RenameModal(profile["name"]), handle)

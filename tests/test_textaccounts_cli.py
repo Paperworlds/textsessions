@@ -96,10 +96,10 @@ def test_list_shows_worker_tag(tmp_path, monkeypatch):
     assert "[worker]" in result.output
 
 
-# ── switch ────────────────────────────────────────────────────────────────────
+# ── show ──────────────────────────────────────────────────────────────────────
 
 
-def test_switch_outputs_only_fish_env_line(tmp_path, monkeypatch):
+def test_show_outputs_fish_env_line(tmp_path, monkeypatch):
     registry, config_path = make_registry(tmp_path)
 
     d = tmp_path / "claude-work"
@@ -109,27 +109,25 @@ def test_switch_outputs_only_fish_env_line(tmp_path, monkeypatch):
     patch_registry(monkeypatch, registry, config_path)
 
     runner = CliRunner()
-    result = runner.invoke(main, ["switch", "work"])
+    result = runner.invoke(main, ["show", "work"])
 
     assert result.exit_code == 0
-    lines = result.output.strip().splitlines()
-    assert len(lines) == 1
-    assert lines[0] == f"set -gx CLAUDE_CONFIG_DIR {d}"
+    assert result.output.strip() == f"set -gx CLAUDE_CONFIG_DIR {d}"
 
 
-def test_switch_default_outputs_unset_line(tmp_path, monkeypatch):
+def test_show_default_outputs_unset_line(tmp_path, monkeypatch):
     registry, config_path = make_registry(tmp_path)
     patch_registry(monkeypatch, registry, config_path)
 
     runner = CliRunner()
-    result = runner.invoke(main, ["switch", "default"])
+    result = runner.invoke(main, ["show", "default"])
 
     assert result.exit_code == 0
     assert result.output.strip() == "set -e CLAUDE_CONFIG_DIR"
 
 
-def test_switch_no_rich_markup(tmp_path, monkeypatch):
-    """switch must emit plain text only — no Rich markup or colour codes."""
+def test_show_no_rich_markup(tmp_path, monkeypatch):
+    """show must emit plain text only — no Rich markup or colour codes."""
     registry, config_path = make_registry(tmp_path)
 
     d = tmp_path / "claude-work"
@@ -139,7 +137,7 @@ def test_switch_no_rich_markup(tmp_path, monkeypatch):
     patch_registry(monkeypatch, registry, config_path)
 
     runner = CliRunner()
-    result = runner.invoke(main, ["switch", "work"])
+    result = runner.invoke(main, ["show", "work"])
 
     assert "[" not in result.output or "set" in result.output  # no Rich tags
     assert "\x1b" not in result.output  # no ANSI escapes
@@ -203,3 +201,22 @@ def test_create_worker_from_parent(tmp_path, monkeypatch):
     assert "bot" in registry.profiles
     assert registry.profiles["bot"].worker is True
     assert registry.profiles["bot"].parent == "main"
+
+
+# ── install ──────────────────────────────────────────────────────────────────
+
+
+def test_install_writes_fish_files(tmp_path, monkeypatch):
+    fish_config = tmp_path / ".config" / "fish"
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    monkeypatch.setenv("SHELL", "/usr/local/bin/fish")
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["install"])
+
+    assert result.exit_code == 0, result.output
+    assert (fish_config / "functions" / "textaccounts.fish").exists()
+    assert (fish_config / "completions" / "textaccounts.fish").exists()
+    fn_text = (fish_config / "functions" / "textaccounts.fish").read_text()
+    assert "function textaccounts" in fn_text
+    assert "command textaccounts show" in fn_text

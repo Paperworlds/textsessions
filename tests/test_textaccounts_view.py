@@ -27,7 +27,7 @@ def _make_profile_dir(path: Path, email: str = "test@example.com") -> Path:
 
 def _write_registry(config_path: Path, active: str | None, profiles: dict) -> None:
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    data: dict = {"version": 1, "profiles": profiles}
+    data: dict = {"version": "1.0", "profiles": profiles}
     if active:
         data["active"] = active
     with config_path.open("w") as f:

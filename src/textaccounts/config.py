@@ -19,6 +19,7 @@ class Profile:
     adopted: str = ""
     worker: bool = False
     parent: Optional[str] = None
+    aliases: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -49,6 +50,7 @@ def load_registry(config_path: Path = CONFIG_PATH) -> ProfileRegistry:
             adopted=entry.get("adopted", ""),
             worker=entry.get("worker", False),
             parent=entry.get("parent"),
+            aliases=entry.get("aliases", []),
         )
 
     return ProfileRegistry(
@@ -71,9 +73,11 @@ def save_registry(registry: ProfileRegistry, config_path: Path = CONFIG_PATH) ->
         entry["worker"] = profile.worker
         if profile.parent is not None:
             entry["parent"] = profile.parent
+        if profile.aliases:
+            entry["aliases"] = profile.aliases
         profiles_data[name] = entry
 
-    data: dict = {"version": 1}
+    data: dict = {"version": "1.0"}
     if registry.active is not None:
         data["active"] = registry.active
     data["profiles"] = profiles_data

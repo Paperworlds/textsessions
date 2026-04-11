@@ -38,7 +38,7 @@ def _write_registry(config_path: Path, data: dict) -> None:
 def test_textaccounts_available_true(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """textaccounts_available returns True when profiles.yaml exists."""
     config_path = tmp_path / ".textaccounts" / "profiles.yaml"
-    _write_registry(config_path, {"version": 1, "profiles": {}})
+    _write_registry(config_path, {"version": "1.0", "profiles": {}})
     monkeypatch.setattr(profiles_mod, "_TEXTACCOUNTS_CONFIG", config_path)
     assert textaccounts_available() is True
 
@@ -60,7 +60,7 @@ def test_textaccounts_profile_dir_found(tmp_path: Path, monkeypatch: pytest.Monk
     profile_path = tmp_path / "profiles" / "work"
     config_path = tmp_path / ".textaccounts" / "profiles.yaml"
     _write_registry(config_path, {
-        "version": 1,
+        "version": "1.0",
         "profiles": {
             "work": {"path": str(profile_path)},
         },
@@ -72,7 +72,7 @@ def test_textaccounts_profile_dir_found(tmp_path: Path, monkeypatch: pytest.Monk
 def test_textaccounts_profile_dir_unknown(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """textaccounts_profile_dir returns None for an unregistered profile."""
     config_path = tmp_path / ".textaccounts" / "profiles.yaml"
-    _write_registry(config_path, {"version": 1, "profiles": {"work": {"path": "/some/path"}}})
+    _write_registry(config_path, {"version": "1.0", "profiles": {"work": {"path": "/some/path"}}})
     monkeypatch.setattr(profiles_mod, "_TEXTACCOUNTS_CONFIG", config_path)
     assert textaccounts_profile_dir("personal") is None
 
@@ -93,7 +93,7 @@ def test_list_textaccounts_profiles(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     """list_textaccounts_profiles returns sorted profile names."""
     config_path = tmp_path / ".textaccounts" / "profiles.yaml"
     _write_registry(config_path, {
-        "version": 1,
+        "version": "1.0",
         "profiles": {
             "work": {"path": "/a"},
             "personal": {"path": "/b"},
@@ -143,7 +143,7 @@ def test_build_launch_env_sets_claude_config_dir(tmp_path: Path, monkeypatch: py
     """build_launch_env sets CLAUDE_CONFIG_DIR when textaccounts profile is found."""
     profile_path = tmp_path / "profiles" / "work"
     config_path = tmp_path / ".textaccounts" / "profiles.yaml"
-    _write_registry(config_path, {"version": 1, "profiles": {"work": {"path": str(profile_path)}}})
+    _write_registry(config_path, {"version": "1.0", "profiles": {"work": {"path": str(profile_path)}}})
     monkeypatch.setattr(profiles_mod, "_TEXTACCOUNTS_CONFIG", config_path)
 
     with (
@@ -172,7 +172,7 @@ def test_build_launch_env_no_config_dir_when_unavailable(tmp_path: Path, monkeyp
 def test_build_launch_env_no_config_dir_for_unknown_profile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """build_launch_env does not set CLAUDE_CONFIG_DIR when profile not registered."""
     config_path = tmp_path / ".textaccounts" / "profiles.yaml"
-    _write_registry(config_path, {"version": 1, "profiles": {"work": {"path": "/some/path"}}})
+    _write_registry(config_path, {"version": "1.0", "profiles": {"work": {"path": "/some/path"}}})
     monkeypatch.setattr(profiles_mod, "_TEXTACCOUNTS_CONFIG", config_path)
 
     with (
@@ -272,6 +272,6 @@ def test_textaccounts_available_uses_module_constant(monkeypatch: pytest.MonkeyP
     assert textaccounts_available() is False
 
     present = tmp_path / "here.yaml"
-    present.write_text("version: 1\nprofiles: {}\n")
+    present.write_text("version: '1.0'\nprofiles: {}\n")
     monkeypatch.setattr(profiles_mod, "_TEXTACCOUNTS_CONFIG", present)
     assert textaccounts_available() is True

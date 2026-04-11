@@ -14,6 +14,16 @@ def validate_config_dir(path: Path) -> bool:
     return (path / ".claude.json").exists()
 
 
+def resolve_profile(name: str, registry: ProfileRegistry) -> str:
+    """Resolve a name or alias to a profile key. Returns the canonical name."""
+    if name in registry.profiles:
+        return name
+    for key, profile in registry.profiles.items():
+        if name in profile.aliases:
+            return key
+    raise click.UsageError(f"Profile '{name}' not found.")
+
+
 def adopt(name: str, path: Path, registry: ProfileRegistry) -> Profile:
     path = path.expanduser().resolve()
     if name in registry.profiles:
@@ -86,16 +96,59 @@ def create_worker(name: str, parent_name: str, registry: ProfileRegistry) -> Pro
     return profile
 
 
-def switch(name: str, registry: ProfileRegistry) -> str:
+def rename(old_name: str, new_name: str, registry: ProfileRegistry) -> Profile:
+    if old_name not in registry.profiles:
+        raise click.UsageError(f"Profile '{old_name}' not found.")
+    if new_name in registry.profiles:
+        raise click.UsageError(f"Profile '{new_name}' already exists.")
+
+    profile = registry.profiles.pop(old_name)
+    profile = Profile(
+        name=new_name,
+        path=profile.path,
+        email=profile.email,
+        adopted=profile.adopted,
+        worker=profile.worker,
+        parent=profile.parent,
+    )
+    registry.profiles[new_name] = profile
+    if registry.active == old_name:
+        registry.active = new_name
+    return profile
+
+
+def add_alias(profile_name: str, alias: str, registry: ProfileRegistry) -> Profile:
+    """Add an alias to a profile."""
+    canonical = resolve_profile(profile_name, registry)
+    # Check alias doesn't collide with existing profile names or aliases
+    if alias in registry.profiles:
+        raise click.UsageError(f"'{alias}' is already a profile name.")
+    for key, p in registry.profiles.items():
+        if alias in p.aliases:
+            raise click.UsageError(f"'{alias}' is already an alias for '{key}'.")
+    profile = registry.profiles[canonical]
+    profile.aliases.append(alias)
+    return profile
+
+
+def remove_alias(profile_name: str, alias: str, registry: ProfileRegistry) -> Profile:
+    """Remove an alias from a profile."""
+    canonical = resolve_profile(profile_name, registry)
+    profile = registry.profiles[canonical]
+    if alias not in profile.aliases:
+        raise click.UsageError(f"'{alias}' is not an alias for '{canonical}'.")
+    profile.aliases.remove(alias)
+    return profile
+
+
+def show(name: str, registry: ProfileRegistry) -> str:
     if name == "default":
         return "set -e CLAUDE_CONFIG_DIR"
 
-    if name not in registry.profiles:
-        raise click.UsageError(f"Profile '{name}' not found.")
-
-    registry.active = name
-    path = registry.profiles[name].path
-    return f"set -gx CLAUDE_CONFIG_DIR {path}"
+    canonical = resolve_profile(name, registry)
+    registry.active = canonical
+    profile = registry.profiles[canonical]
+    return f"set -gx CLAUDE_CONFIG_DIR {profile.path}"
 
 
 def get_status(registry: ProfileRegistry) -> dict:
@@ -157,6 +210,7 @@ def list_profiles(registry: ProfileRegistry) -> list[dict]:
                 "sessions": count_sessions(profile.path),
                 "active": name == registry.active,
                 "exists": exists,
+                "aliases": profile.aliases,
             }
         )
     return result

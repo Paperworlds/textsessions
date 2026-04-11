@@ -9,7 +9,7 @@ from textaccounts.core import (
     adopt,
     create_from_current,
     create_worker,
-    switch,
+    show,
     list_profiles,
 )
 
@@ -116,9 +116,9 @@ def test_create_worker_copies_only_claude_json_and_settings(tmp_path):
     assert profile.parent == "work"
 
 
-# --- switch ---
+# --- show ---
 
-def test_switch_returns_fish_env_line(tmp_path):
+def test_show_returns_fish_env_line(tmp_path):
     registry, _ = make_registry(tmp_path)
 
     p = tmp_path / "claude-work"
@@ -126,18 +126,18 @@ def test_switch_returns_fish_env_line(tmp_path):
     make_claude_json(p)
     registry.profiles["work"] = Profile(name="work", path=p, email="")
 
-    line = switch("work", registry)
+    line = show("work", registry)
     assert line == f"set -gx CLAUDE_CONFIG_DIR {p}"
 
 
-def test_switch_to_default_returns_unset_line(tmp_path):
+def test_show_to_default_returns_unset_line(tmp_path):
     registry, _ = make_registry(tmp_path)
 
-    line = switch("default", registry)
+    line = show("default", registry)
     assert line == "set -e CLAUDE_CONFIG_DIR"
 
 
-def test_switch_updates_active_in_registry(tmp_path):
+def test_show_updates_active_in_registry(tmp_path):
     registry, _ = make_registry(tmp_path)
 
     p = tmp_path / "claude-work"
@@ -145,7 +145,7 @@ def test_switch_updates_active_in_registry(tmp_path):
     make_claude_json(p)
     registry.profiles["work"] = Profile(name="work", path=p, email="")
 
-    switch("work", registry)
+    show("work", registry)
     assert registry.active == "work"
 
 

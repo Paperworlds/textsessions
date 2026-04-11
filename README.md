@@ -254,13 +254,14 @@ textaccounts is a native profile manager bundled with this repo (`src/textaccoun
 
 When textaccounts is configured, textsessions automatically injects `CLAUDE_CONFIG_DIR` before launching or resuming any session whose repo `profile` matches a registered profile name.
 
+See [docs/onboarding.md](docs/onboarding.md) for the full onboarding guide, including the interactive view.
+
 #### Setup flow
 
-**1. Install** (included automatically when you `pip install textsessions`):
+**1. Install shell integration:**
 
 ```sh
-# Install fish completions + the ta wrapper function
-cp completions/ta.fish ~/.config/fish/completions/
+textaccounts install        # writes fish function + completions to ~/.config/fish/
 ```
 
 **2. Register your existing Claude config dirs** — nothing moves, just registers the paths:
@@ -270,12 +271,12 @@ textaccounts adopt work ~/.claude-work
 textaccounts adopt personal ~/.claude-personal
 ```
 
-**3. Switch profiles** — the `ta` wrapper evals the env line so your shell picks it up:
+**3. Switch profiles:**
 
 ```sh
-ta switch work       # sets CLAUDE_CONFIG_DIR=~/.claude-work in your shell
-ta switch personal   # sets CLAUDE_CONFIG_DIR=~/.claude-personal
-ta switch default    # unsets CLAUDE_CONFIG_DIR (back to ~/.claude)
+textaccounts switch work       # sets CLAUDE_CONFIG_DIR=~/.claude-work in your shell
+textaccounts switch personal   # sets CLAUDE_CONFIG_DIR=~/.claude-personal
+textaccounts switch default    # unsets CLAUDE_CONFIG_DIR (back to ~/.claude)
 ```
 
 **4. Wire repos to profiles** in your config:
@@ -296,7 +297,12 @@ textaccounts adopt <name> <path>         # register an existing dir
 textaccounts create <name>               # snapshot current config dir into ~/.textaccounts/profiles/
 textaccounts create <name> --worker \
   --from <parent>                        # minimal copy: .claude.json + settings.json only
-textaccounts switch <name>               # print fish env line (use via: ta switch <name>)
+textaccounts switch <name>               # switch profile (sets CLAUDE_CONFIG_DIR)
+textaccounts show <name>                 # print the shell command without executing
+textaccounts rename <old> <new>          # rename a profile
+textaccounts alias <profile> <alias>     # add a short alias
+textaccounts view                        # interactive profile view
+textaccounts install                     # install shell integration
 ```
 
 Set `textaccounts = false` under `[integrations]` to disable profile injection entirely.
