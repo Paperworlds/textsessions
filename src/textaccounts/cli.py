@@ -112,3 +112,10 @@ def status() -> None:
         console.print(f"[bold]CLAUDE_CONFIG_DIR:[/bold] {info['env_dir']} ({sync})")
     else:
         console.print("[bold]CLAUDE_CONFIG_DIR:[/bold] [dim]not set[/dim]")
+
+
+@main.command()
+def view() -> None:
+    """Launch the interactive profile view."""
+    from textaccounts.view import TextAccountsApp
+    TextAccountsApp().run()

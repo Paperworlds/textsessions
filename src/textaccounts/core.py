@@ -156,6 +156,7 @@ def list_profiles(registry: ProfileRegistry) -> list[dict]:
                 "email": profile.email,
                 "worker": profile.worker,
                 "dir_size": size,
+                "sessions": count_sessions(profile.path),
                 "active": name == registry.active,
             }
         )
