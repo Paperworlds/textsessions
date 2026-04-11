@@ -32,18 +32,18 @@ Optional integrations (auto-detected at runtime):
 pip install textsessions
 ```
 
+With multi-account support ([textaccounts](https://github.com/Paperworlds/textaccounts)):
+
+```sh
+pip install textsessions[accounts]
+```
+
 Or from source:
 
 ```sh
-git clone https://github.com/pdonorio/textsessions
+git clone https://github.com/Paperworlds/textsessions
 cd textsessions
-pip install -e .
-```
-
-Install fish completions:
-
-```sh
-cp completions/textsessions.fish ~/.config/fish/completions/
+pip install -e ".[accounts]"
 ```
 
 ---
@@ -250,11 +250,9 @@ If [ai-proxy](https://github.com/pdonorio/claude-code-proxy) is running on `loca
 
 ### textaccounts
 
-textaccounts is a native profile manager bundled with this repo (`src/textaccounts/`). It isolates Claude accounts by pointing `CLAUDE_CONFIG_DIR` at full config directories — keeping sessions, memory, and auth separate per profile.
+[textaccounts](https://github.com/Paperworlds/textaccounts) is an optional profile manager that isolates Claude accounts by pointing `CLAUDE_CONFIG_DIR` at separate config directories — keeping sessions, memory, and auth separate per profile.
 
-When textaccounts is configured, textsessions automatically injects `CLAUDE_CONFIG_DIR` before launching or resuming any session whose repo `profile` matches a registered profile name.
-
-See [docs/onboarding.md](docs/onboarding.md) for the full onboarding guide, including the interactive view.
+Install with `pip install textsessions[accounts]` to enable. When configured, textsessions automatically injects `CLAUDE_CONFIG_DIR` before launching or resuming any session whose repo `profile` matches a registered profile name. Without textaccounts, you can still use custom commands (see Custom Commands section above) or a single default account.
 
 #### Setup flow
 

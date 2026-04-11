@@ -20,6 +20,7 @@ from ..indexer import (
     save_index,
     _update_legacy_priority,
 )
+from ..config import detect_claude_dirs
 from ..profiles import build_launch_env, resume_cmd
 from ..sessions import delete_session_from_index
 from .modals import (
@@ -36,6 +37,21 @@ from .modals import (
 
 class ActionsMixin:
     """All action_* methods for TextSessionsApp. Mixed in via multiple inheritance."""
+
+    def _reindex_repo_sync(self, repo_path: Path) -> None:
+        """Reindex a single repo from .jsonl files (blocking)."""
+        from ..indexer import reindex_repos
+        matching = [r for r in self._config.repos if r.path == repo_path]
+        if matching:
+            reindex_repos(matching, detect_claude_dirs())
+
+    def _reindex_repo(self, repo_path: Path) -> None:
+        """Reindex a single repo in the background, then refresh the view."""
+        async def _do_reindex() -> None:
+            import asyncio
+            await asyncio.to_thread(self._reindex_repo_sync, repo_path)
+            self._reload_sessions()
+        self.run_worker(_do_reindex(), exclusive=False)
 
     def action_focus_filter(self) -> None:
         from textual.widgets import Input
@@ -69,7 +85,6 @@ class ActionsMixin:
         self._refresh_view()
 
     def action_reindex(self) -> None:
-        from ..config import detect_claude_dirs
         from ..indexer import reindex_repos
         from ..sessions import _expand_recursive
         repos = [
@@ -238,6 +253,7 @@ class ActionsMixin:
             result = subprocess.run(cmd, env=env, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, cwd=s.repo_path)
         if result.returncode != 0:
             self.notify(f"Resume failed (exit {result.returncode})", severity="error")
+        self._reindex_repo(s.repo_path)
 
     def action_new_session(self) -> None:
         seen: dict[str, str] = {}  # profile -> first repo path
@@ -280,7 +296,11 @@ class ActionsMixin:
             if proc.returncode != 0:
                 self.notify(f"Launch failed (exit {proc.returncode})", severity="error")
 
-            self._apply_post_launch_metadata(result, launch_time, known_ids)
+            async def _post_launch() -> None:
+                import asyncio
+                await asyncio.to_thread(self._reindex_repo_sync, Path(result.repo_path))
+                self._apply_post_launch_metadata(result, launch_time, known_ids)
+            self.run_worker(_post_launch(), exclusive=False)
 
         self.push_screen(
             NewSessionModal(profiles, default_profile, default_repo_path),
