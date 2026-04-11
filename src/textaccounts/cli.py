@@ -106,6 +106,7 @@ def status() -> None:
     console.print(f"[bold]Path:[/bold] {info['path']}")
     if info["email"]:
         console.print(f"[bold]Email:[/bold] {info['email']}")
+    console.print(f"[bold]Sessions:[/bold] {info['sessions']}")
     if info["env_dir"]:
         sync = "[green]in sync[/green]" if info["in_sync"] else "[red]out of sync[/red]"
         console.print(f"[bold]CLAUDE_CONFIG_DIR:[/bold] {info['env_dir']} ({sync})")

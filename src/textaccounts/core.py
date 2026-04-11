@@ -112,12 +112,15 @@ def get_status(registry: ProfileRegistry) -> dict:
     elif env_dir and not profile:
         in_sync = False
 
+    sessions = count_sessions(profile.path) if profile else 0
+
     return {
         "active": active,
         "path": str(profile.path) if profile else None,
         "email": profile.email if profile else None,
         "env_dir": env_dir,
         "in_sync": in_sync,
+        "sessions": sessions,
     }
 
 
@@ -128,12 +131,24 @@ def count_sessions(path: Path) -> int:
     return sum(1 for p in projects_dir.iterdir() if p.is_dir())
 
 
+def _dir_size_bytes(path: Path) -> int:
+    """Return disk usage of path in bytes using du (fast, handles large dirs)."""
+    import subprocess
+    try:
+        out = subprocess.run(
+            ["du", "-sk", str(path)], capture_output=True, text=True, timeout=5
+        )
+        if out.returncode == 0:
+            return int(out.stdout.split()[0]) * 1024
+    except Exception:
+        pass
+    return 0
+
+
 def list_profiles(registry: ProfileRegistry) -> list[dict]:
     result = []
     for name, profile in registry.profiles.items():
-        size = 0
-        if profile.path.is_dir():
-            size = sum(f.stat().st_size for f in profile.path.rglob("*") if f.is_file())
+        size = _dir_size_bytes(profile.path) if profile.path.is_dir() else 0
         result.append(
             {
                 "name": name,

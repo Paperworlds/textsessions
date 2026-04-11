@@ -21,12 +21,12 @@ function __ta_profiles
 end
 
 # Completions for ta/textaccounts main commands
-complete -c ta -f -n "__fish_use_subcommand_from_list" -s h -l help -d "Show help"
-complete -c ta -f -n "__fish_use_subcommand_from_list" -a "adopt" -d "Register existing dir as profile"
-complete -c ta -f -n "__fish_use_subcommand_from_list" -a "create" -d "Snapshot current config dir"
-complete -c ta -f -n "__fish_use_subcommand_from_list" -a "list" -d "Show all profiles"
-complete -c ta -f -n "__fish_use_subcommand_from_list" -a "switch" -d "Switch to a profile"
-complete -c ta -f -n "__fish_use_subcommand_from_list" -a "status" -d "Show active profile info"
+complete -c ta -f -n "not __fish_seen_subcommand_from adopt create list switch status" -s h -l help -d "Show help"
+complete -c ta -f -n "not __fish_seen_subcommand_from adopt create list switch status" -a "adopt" -d "Register existing dir as profile"
+complete -c ta -f -n "not __fish_seen_subcommand_from adopt create list switch status" -a "create" -d "Snapshot current config dir"
+complete -c ta -f -n "not __fish_seen_subcommand_from adopt create list switch status" -a "list" -d "Show all profiles"
+complete -c ta -f -n "not __fish_seen_subcommand_from adopt create list switch status" -a "switch" -d "Switch to a profile"
+complete -c ta -f -n "not __fish_seen_subcommand_from adopt create list switch status" -a "status" -d "Show active profile info"
 
 # Completions for adopt command (needs name and path)
 complete -c ta -n "__fish_seen_subcommand_from adopt" -f -a "(__ta_profiles)" -d "Profile name"
@@ -40,12 +40,12 @@ complete -c ta -n "__fish_seen_subcommand_from create" -l from -d "Parent profil
 complete -c ta -n "__fish_seen_subcommand_from switch" -f -a "(__ta_profiles)" -d "Profile name"
 
 # textaccounts command (full name, for power users)
-complete -c textaccounts -f -n "__fish_use_subcommand_from_list" -s h -l help -d "Show help"
-complete -c textaccounts -f -n "__fish_use_subcommand_from_list" -a "adopt" -d "Register existing dir as profile"
-complete -c textaccounts -f -n "__fish_use_subcommand_from_list" -a "create" -d "Snapshot current config dir"
-complete -c textaccounts -f -n "__fish_use_subcommand_from_list" -a "list" -d "Show all profiles"
-complete -c textaccounts -f -n "__fish_use_subcommand_from_list" -a "switch" -d "Switch to a profile"
-complete -c textaccounts -f -n "__fish_use_subcommand_from_list" -a "status" -d "Show active profile info"
+complete -c textaccounts -f -n "not __fish_seen_subcommand_from adopt create list switch status" -s h -l help -d "Show help"
+complete -c textaccounts -f -n "not __fish_seen_subcommand_from adopt create list switch status" -a "adopt" -d "Register existing dir as profile"
+complete -c textaccounts -f -n "not __fish_seen_subcommand_from adopt create list switch status" -a "create" -d "Snapshot current config dir"
+complete -c textaccounts -f -n "not __fish_seen_subcommand_from adopt create list switch status" -a "list" -d "Show all profiles"
+complete -c textaccounts -f -n "not __fish_seen_subcommand_from adopt create list switch status" -a "switch" -d "Switch to a profile"
+complete -c textaccounts -f -n "not __fish_seen_subcommand_from adopt create list switch status" -a "status" -d "Show active profile info"
 
 complete -c textaccounts -n "__fish_seen_subcommand_from adopt" -f -a "(__ta_profiles)" -d "Profile name"
 complete -c textaccounts -n "__fish_seen_subcommand_from create" -f
