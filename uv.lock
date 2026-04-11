@@ -194,6 +194,17 @@ wheels = [
 ]
 
 [[package]]
+name = "textaccounts"
+version = "0.1.0"
+source = { git = "https://github.com/Paperworlds/textaccounts.git?rev=v0.2.0#09f145c38a482e04119321786dc594f248b760e4" }
+dependencies = [
+    { name = "click" },
+    { name = "pyyaml" },
+    { name = "rich" },
+    { name = "textual" },
+]
+
+[[package]]
 name = "textsessions"
 version = "0.4.1"
 source = { editable = "." }
@@ -203,6 +214,11 @@ dependencies = [
     { name = "rich" },
     { name = "textual" },
     { name = "tomli-w" },
+]
+
+[package.optional-dependencies]
+accounts = [
+    { name = "textaccounts" },
 ]
 
 [package.dev-dependencies]
@@ -215,10 +231,12 @@ requires-dist = [
     { name = "click", specifier = ">=8.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rich", specifier = ">=13.0" },
+    { name = "textaccounts", marker = "extra == 'accounts'", git = "https://github.com/Paperworlds/textaccounts.git?rev=v0.2.0" },
     { name = "textual", specifier = ">=0.70" },
     { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0" },
     { name = "tomli-w", specifier = ">=1.0" },
 ]
+provides-extras = ["accounts"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.0.3" }]

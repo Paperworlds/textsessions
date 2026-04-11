@@ -1,6 +1,12 @@
 """Profile and integration detection helpers for textsessions.
 
-Detects textaccounts and ai-proxy at runtime.
+Three tiers for profile resolution:
+  1. textaccounts installed → delegates to textaccounts.api (auto-discovers profiles,
+     sets CLAUDE_CONFIG_DIR). Zero config.
+  2. No textaccounts, custom commands → user sets claude_cmd = "claude-{profile}" in
+     config.toml. Each repo's profile name is substituted into the template.
+  3. Single account → plain "claude", no profile switching.
+
 Never auto-installs anything — only detects and guides.
 """
 
@@ -9,52 +15,32 @@ from __future__ import annotations
 import os
 import shutil
 import socket
-from pathlib import Path
 
-_TEXTACCOUNTS_CONFIG = Path.home() / ".textaccounts" / "profiles.yaml"
+# --- textaccounts integration (optional dependency) --------------------------
+# All textaccounts knowledge is delegated to its public API. textsessions never
+# reads ~/.textaccounts/ directly — that's textaccounts' business.
 
+try:
+    from textaccounts.api import (
+        available as textaccounts_available,
+        env_for_profile as _ta_env_for_profile,
+        list_profiles as list_textaccounts_profiles,
+    )
+    _HAS_TEXTACCOUNTS = True
+except ImportError:
+    _HAS_TEXTACCOUNTS = False
 
-def _textaccounts_config_path() -> Path:
-    """Return the textaccounts config path (overridable in tests via module attr)."""
-    return _TEXTACCOUNTS_CONFIG
+    def textaccounts_available() -> bool:  # type: ignore[misc]
+        return False
 
-
-def textaccounts_available() -> bool:
-    """True if ~/.textaccounts/profiles.yaml exists."""
-    return _textaccounts_config_path().exists()
-
-
-def textaccounts_profile_dir(profile: str) -> Path | None:
-    """Return the path for the named profile from ~/.textaccounts/profiles.yaml, or None."""
-    config_path = _textaccounts_config_path()
-    if not config_path.exists():
-        return None
-    try:
-        import yaml
-        with config_path.open() as f:
-            data = yaml.safe_load(f) or {}
-        entry = (data.get("profiles") or {}).get(profile)
-        if entry is None:
-            return None
-        p = Path(entry["path"])
-        return p if p.exists() else p  # return even if not yet created
-    except Exception:
-        return None
-
-
-def list_textaccounts_profiles() -> list[str]:
-    """Return profile names from ~/.textaccounts/profiles.yaml."""
-    config_path = _textaccounts_config_path()
-    if not config_path.exists():
-        return []
-    try:
-        import yaml
-        with config_path.open() as f:
-            data = yaml.safe_load(f) or {}
-        return sorted((data.get("profiles") or {}).keys())
-    except Exception:
+    def list_textaccounts_profiles() -> list[str]:  # type: ignore[misc]
         return []
 
+    def _ta_env_for_profile(name: str) -> dict[str, str]:
+        return {}
+
+
+# --- ai-proxy integration ---------------------------------------------------
 
 def aiproxy_available() -> bool:
     """True if ai-proxy binary is on PATH."""
@@ -70,15 +56,17 @@ def aiproxy_running() -> bool:
         return False
 
 
+# --- launch helpers ----------------------------------------------------------
+
 def resume_cmd(session_id: str, session_name: str, profile: str, env: dict[str, str], claude_cmd_tpl: str = "claude") -> list[str]:
     """Return the argv list to resume a Claude session.
 
     Handles tmux window rename and profile-based claude command selection.
     Always returns a fish command so that fish functions are available.
 
-    claude_cmd_tpl: command template from config (e.g. "claude" or "claude-{profile}").
-    {profile} is substituted with the session profile. CLAUDE_CONFIG_DIR takes
-    precedence and always uses plain "claude".
+    Tier 1 (textaccounts): CLAUDE_CONFIG_DIR is in env → use plain "claude".
+    Tier 2 (custom commands): claude_cmd_tpl has {profile} → expands to e.g. "claude-work".
+    Tier 3 (single account): claude_cmd_tpl is "claude" → uses "claude".
     """
     import shlex
 
@@ -99,27 +87,22 @@ def resume_cmd(session_id: str, session_name: str, profile: str, env: dict[str, 
 
 
 def build_launch_env(profile: str, integrations_enabled: dict[str, bool]) -> dict[str, str]:
-    """Build subprocess env dict with textaccounts and ai-proxy integrations applied.
+    """Build subprocess env dict with integrations applied.
 
-    Args:
-        profile: The profile name from repo config.
-        integrations_enabled: Dict with 'textaccounts' and 'aiproxy' bool values
-                              (from IntegrationsConfig).
-
-    Returns:
-        A copy of os.environ with any integration env vars injected.
+    Tier 1: textaccounts installed + enabled → delegates to textaccounts.api.env_for_profile()
+            to get the right env vars (currently CLAUDE_CONFIG_DIR).
+    Tier 2/3: no textaccounts → env is unchanged, resume_cmd handles command selection.
     """
     env = os.environ.copy()
 
-    # textaccounts: set CLAUDE_CONFIG_DIR when textaccounts is available and
-    # the profile is registered.
-    if integrations_enabled.get("textaccounts", True):
+    if integrations_enabled.get("textaccounts", True) and _HAS_TEXTACCOUNTS:
         if textaccounts_available():
-            d = textaccounts_profile_dir(profile)
-            if d is not None:
-                env["CLAUDE_CONFIG_DIR"] = str(d)
+            try:
+                profile_env = _ta_env_for_profile(profile)
+                env.update(profile_env)
+            except ValueError:
+                pass  # profile not found in textaccounts — fall through to tier 2/3
 
-    # ai-proxy: inject ANTHROPIC_BASE_URL when proxy is detected as running.
     if integrations_enabled.get("aiproxy", True):
         if aiproxy_available() and aiproxy_running():
             env["ANTHROPIC_BASE_URL"] = "http://localhost:7474"

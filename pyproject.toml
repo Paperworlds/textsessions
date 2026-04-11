@@ -16,13 +16,20 @@ dependencies = [
     "tomli-w>=1.0",
 ]
 
+[project.optional-dependencies]
+accounts = [
+    "textaccounts @ git+https://github.com/Paperworlds/textaccounts.git@v0.2.0",
+]
+
 [project.scripts]
 textsessions = "textsessions.cli:main"
 claude-sessions-index = "textsessions.cli:sessions_index_compat"
-textaccounts = "textaccounts.cli:main"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/textsessions", "src/textaccounts"]
+packages = ["src/textsessions"]
 
 [dependency-groups]
 dev = [
