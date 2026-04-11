@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -12,7 +11,9 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Footer, Header, Input, Label, Static
 
 from textaccounts import core
-from textaccounts.config import CONFIG_PATH, load_registry, save_registry
+from textaccounts.config import CONFIG_PATH, extract_email, load_registry, save_registry
+
+_HOME = Path.home()
 
 
 def _fmt_size(size_bytes: int) -> str:
@@ -20,18 +21,52 @@ def _fmt_size(size_bytes: int) -> str:
     return f"{kb // 1024}M" if kb > 1024 else f"{kb}K"
 
 
-def _render_detail(profile: dict | None) -> str:
+def _short_path(path: Path) -> str:
+    try:
+        return "~/" + str(path.relative_to(_HOME))
+    except ValueError:
+        return str(path)
+
+
+def _render_detail(profile: dict | None, suggestion: Path | None) -> str:
+    if suggestion is not None:
+        email = extract_email(suggestion) if suggestion.is_dir() else ""
+        lines = [
+            "[dim]Not yet adopted[/dim]",
+            "",
+            f"[bold]{_short_path(suggestion)}[/bold]",
+        ]
+        if email:
+            lines.append(f"Email: {email}")
+        lines += [
+            "",
+            "Press [bold]a[/bold] to adopt this directory.",
+            f"Suggested name: [bold]{suggestion.name.lstrip('.')}[/bold]",
+        ]
+        return "\n".join(lines)
+
     if profile is None:
-        return "[dim]No profile selected[/dim]"
+        return (
+            "[dim]No profiles registered.[/dim]\n\n"
+            "Press [bold]a[/bold] to adopt an existing Claude config dir.\n\n"
+            "textaccounts looks for dirs like:\n"
+            "  ~/.claude/\n"
+            "  ~/.claude-work/\n"
+            "  ~/.claude-personal/"
+        )
+
     lines = []
-    if profile["active"]:
+    if not profile["exists"]:
+        lines.append("[bold red]✗ path not found[/bold red]")
+    elif profile["active"]:
         lines.append("[bold green]● active[/bold green]")
     lines.append(f"[bold]{profile['name']}[/bold]")
-    lines.append(f"Path:     {profile['path']}")
+    lines.append(f"Path:     {_short_path(profile['path'])}")
     if profile["email"]:
         lines.append(f"Email:    {profile['email']}")
-    lines.append(f"Sessions: {profile['sessions']}")
-    lines.append(f"Size:     {_fmt_size(profile['dir_size'])}")
+    if profile["exists"]:
+        lines.append(f"Sessions: {profile['sessions']}")
+        lines.append(f"Size:     {_fmt_size(profile['dir_size'])}")
     if profile["worker"]:
         lines.append("[dim]worker (auth-only copy)[/dim]")
     return "\n".join(lines)
@@ -40,16 +75,27 @@ def _render_detail(profile: dict | None) -> str:
 class AdoptModal(ModalScreen["tuple[str, str] | None"]):
     BINDINGS = [Binding("escape", "dismiss(None)", "Cancel")]
 
+    def __init__(self, name_hint: str = "", path_hint: str = "") -> None:
+        super().__init__()
+        self._name_hint = name_hint
+        self._path_hint = path_hint
+
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
             yield Label("[bold]Adopt existing Claude config dir[/bold]", id="title")
             yield Label("Profile name:")
-            yield Input(placeholder="e.g. work", id="name-input")
+            yield Input(placeholder="e.g. work", value=self._name_hint, id="name-input")
             yield Label("Path:")
-            yield Input(placeholder="e.g. ~/.claude-work", id="path-input")
+            yield Input(placeholder="e.g. ~/.claude-work", value=self._path_hint, id="path-input")
             with Horizontal(id="buttons"):
                 yield Button("Adopt", variant="primary", id="adopt-btn")
                 yield Button("Cancel", id="cancel-btn")
+
+    def on_mount(self) -> None:
+        if self._name_hint:
+            self.query_one("#path-input", Input).focus()
+        else:
+            self.query_one("#name-input", Input).focus()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "adopt-btn":
@@ -104,6 +150,7 @@ class TextAccountsApp(App):
         super().__init__()
         self._config_path = config_path
         self._profiles: list[dict] = []
+        self._suggestions: list[Path] = []
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -118,14 +165,42 @@ class TextAccountsApp(App):
     def _refresh(self) -> None:
         registry = load_registry(self._config_path)
         self._profiles = core.list_profiles(registry)
+        self._suggestions = core.discover_unregistered(registry)
+
         table = self.query_one(DataTable)
         table.clear(columns=True)
         table.add_columns("", "Name", "Path", "Email", "Sessions", "Size")
+
         for p in self._profiles:
-            marker = "*" if p["active"] else ""
-            size = _fmt_size(p["dir_size"])
-            name_col = p["name"] + (" [worker]" if p["worker"] else "")
-            table.add_row(marker, name_col, str(p["path"]), p["email"] or "", str(p["sessions"]), size)
+            if not p["exists"]:
+                marker = "[red]✗[/red]"
+                name_col = f"[red]{p['name']}[/red]"
+            elif p["active"]:
+                marker = "[green]*[/green]"
+                name_col = f"[bold]{p['name']}[/bold]" + (" [worker]" if p["worker"] else "")
+            else:
+                marker = ""
+                name_col = p["name"] + (" [worker]" if p["worker"] else "")
+            table.add_row(
+                marker,
+                name_col,
+                _short_path(p["path"]),
+                p["email"] or "",
+                str(p["sessions"]) if p["exists"] else "—",
+                _fmt_size(p["dir_size"]) if p["exists"] else "—",
+            )
+
+        for sug in self._suggestions:
+            name_hint = sug.name.lstrip(".")
+            table.add_row(
+                "[dim]+[/dim]",
+                f"[dim]{name_hint}[/dim]",
+                f"[dim]{_short_path(sug)}[/dim]",
+                "[dim]not adopted[/dim]",
+                "[dim]—[/dim]",
+                "[dim]—[/dim]",
+            )
+
         self._update_detail()
 
     def _selected_profile(self) -> dict | None:
@@ -135,8 +210,17 @@ class TextAccountsApp(App):
             return self._profiles[idx]
         return None
 
+    def _selected_suggestion(self) -> Path | None:
+        table = self.query_one(DataTable)
+        idx = table.cursor_row - len(self._profiles)
+        if 0 <= idx < len(self._suggestions):
+            return self._suggestions[idx]
+        return None
+
     def _update_detail(self) -> None:
-        self.query_one("#detail", Static).update(_render_detail(self._selected_profile()))
+        profile = self._selected_profile()
+        suggestion = self._selected_suggestion() if profile is None else None
+        self.query_one("#detail", Static).update(_render_detail(profile, suggestion))
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         self._update_detail()
@@ -144,6 +228,9 @@ class TextAccountsApp(App):
     def action_switch_profile(self) -> None:
         profile = self._selected_profile()
         if profile is None:
+            return
+        if not profile["exists"]:
+            self.notify("Path not found — cannot switch to a broken profile.", severity="error")
             return
         name = profile["name"]
         try:
@@ -156,6 +243,14 @@ class TextAccountsApp(App):
             self.notify(str(e), severity="error")
 
     def action_adopt(self) -> None:
+        suggestion = self._selected_suggestion()
+        if suggestion is not None:
+            name_hint = suggestion.name.lstrip(".")
+            path_hint = _short_path(suggestion)
+        else:
+            name_hint = ""
+            path_hint = ""
+
         def handle(result: tuple[str, str] | None) -> None:
             if result is None:
                 return
@@ -169,4 +264,4 @@ class TextAccountsApp(App):
             except Exception as e:
                 self.notify(str(e), severity="error")
 
-        self.push_screen(AdoptModal(), handle)
+        self.push_screen(AdoptModal(name_hint=name_hint, path_hint=path_hint), handle)

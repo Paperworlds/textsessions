@@ -25,17 +25,6 @@ def make_registry(tmp_path: Path) -> tuple[ProfileRegistry, Path]:
     profiles_dir = tmp_path / "profiles"
     profiles_dir.mkdir()
     registry = ProfileRegistry(profiles_dir=profiles_dir)
-    registry._config_path = config_path  # store for convenience
-    # Patch save_registry to use this config_path
-    import textaccounts.core as core_module
-    import textaccounts.config as config_module
-
-    original_save = config_module.save_registry
-
-    def patched_save(reg, config_path=config_path):
-        original_save(reg, config_path=config_path)
-
-    core_module.save_registry = patched_save
     return registry, config_path
 
 

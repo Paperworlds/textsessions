@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.table import Table
 
 from textaccounts import __version__
-from textaccounts.config import load_registry
+from textaccounts.config import load_registry, save_registry
 from textaccounts import core
 
 console = Console()
@@ -26,6 +26,7 @@ def adopt(name: str, path: str) -> None:
     """Adopt an existing Claude config directory as a named profile."""
     registry = load_registry()
     profile = core.adopt(name, Path(path), registry)
+    save_registry(registry)
     console.print(
         f"[green]Adopted[/green] profile [bold]{profile.name}[/bold] → {profile.path}"
     )
@@ -42,12 +43,14 @@ def create(name: str, worker: bool, parent: str | None) -> None:
         if not parent:
             raise click.UsageError("--from <parent> is required with --worker")
         profile = core.create_worker(name, parent, registry)
+        save_registry(registry)
         console.print(
             f"[green]Created[/green] worker profile [bold]{profile.name}[/bold]"
             f" (parent: {profile.parent})"
         )
     else:
         profile = core.create_from_current(name, registry)
+        save_registry(registry)
         console.print(
             f"[green]Created[/green] profile [bold]{profile.name}[/bold] → {profile.path}"
         )
@@ -89,6 +92,8 @@ def switch(name: str) -> None:
     """Switch to a profile (prints fish env line for eval)."""
     registry = load_registry()
     line = core.switch(name, registry)
+    if name != "default":
+        save_registry(registry)
     click.echo(line)
 
 

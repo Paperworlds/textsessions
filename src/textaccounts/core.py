@@ -33,7 +33,6 @@ def adopt(name: str, path: Path, registry: ProfileRegistry) -> Profile:
         parent=None,
     )
     registry.profiles[name] = profile
-    save_registry(registry)
     return profile
 
 
@@ -84,7 +83,6 @@ def create_worker(name: str, parent_name: str, registry: ProfileRegistry) -> Pro
         parent=parent_name,
     )
     registry.profiles[name] = profile
-    save_registry(registry)
     return profile
 
 
@@ -96,7 +94,6 @@ def switch(name: str, registry: ProfileRegistry) -> str:
         raise click.UsageError(f"Profile '{name}' not found.")
 
     registry.active = name
-    save_registry(registry)
     path = registry.profiles[name].path
     return f"set -gx CLAUDE_CONFIG_DIR {path}"
 
@@ -149,6 +146,7 @@ def list_profiles(registry: ProfileRegistry) -> list[dict]:
     result = []
     for name, profile in registry.profiles.items():
         size = _dir_size_bytes(profile.path) if profile.path.is_dir() else 0
+        exists = profile.path.is_dir()
         result.append(
             {
                 "name": name,
@@ -158,6 +156,17 @@ def list_profiles(registry: ProfileRegistry) -> list[dict]:
                 "dir_size": size,
                 "sessions": count_sessions(profile.path),
                 "active": name == registry.active,
+                "exists": exists,
             }
         )
     return result
+
+
+def discover_unregistered(registry: ProfileRegistry) -> list[Path]:
+    """Scan ~/.claude-*/ for valid Claude config dirs not yet registered."""
+    registered = {p.path.resolve() for p in registry.profiles.values()}
+    found = []
+    for d in sorted(Path.home().glob(".claude*")):
+        if d.is_dir() and d.resolve() not in registered and validate_config_dir(d):
+            found.append(d)
+    return found

@@ -27,14 +27,13 @@ def make_registry(tmp_path: Path) -> tuple[ProfileRegistry, Path]:
 def patch_registry(monkeypatch, registry: ProfileRegistry, config_path: Path) -> None:
     """Make cli.load_registry return our test registry and wire save_registry."""
     import textaccounts.config as config_module
-    import textaccounts.core as core_module
 
     original_save = config_module.save_registry
 
     def patched_save(reg, cp=config_path):
         original_save(reg, config_path=cp)
 
-    monkeypatch.setattr(core_module, "save_registry", patched_save)
+    monkeypatch.setattr("textaccounts.cli.save_registry", patched_save)
     monkeypatch.setattr("textaccounts.cli.load_registry", lambda: registry)
 
 
