@@ -230,7 +230,7 @@ class ActionsMixin:
         profile = s.profile
         resume_id = s.id
         env = build_launch_env(profile, {
-            "cloak": self._config.integrations.cloak,
+            "textaccounts": self._config.integrations.textaccounts,
             "aiproxy": self._config.integrations.aiproxy,
         })
         cmd = resume_cmd(resume_id, s.name, profile, env, self._config.ui.claude_cmd)
@@ -262,7 +262,7 @@ class ActionsMixin:
 
             import shlex
             env = build_launch_env(result.profile, {
-                "cloak": self._config.integrations.cloak,
+                "textaccounts": self._config.integrations.textaccounts,
                 "aiproxy": self._config.integrations.aiproxy,
             })
             if "CLAUDE_CONFIG_DIR" in env:

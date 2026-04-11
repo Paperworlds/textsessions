@@ -22,7 +22,7 @@ from textual.widgets import (
 )
 
 from ..config import Config, RepoConfig, load, repo_key
-from ..profiles import cloak_available
+from ..profiles import textaccounts_available
 from ..indexer import (
     do_priority,
     find_session_created_after,
@@ -102,11 +102,11 @@ class SessionDetail(Static):
         else:
             lines.append("  [dim]Proxy not running or no data[/dim]")
 
-        # Show cloak hint once when not installed and session has a non-default profile
-        if s.profile != "default" and not cloak_available():
+        # Show textaccounts hint when not configured and session has a non-default profile
+        if s.profile != "default" and not textaccounts_available():
             lines += [
                 "",
-                "[dim]Profiles: install cloak for isolation (textsessions profile status)[/dim]",
+                "[dim]Profiles: run textaccounts adopt <name> <path> to activate isolation[/dim]",
             ]
 
         return "\n".join(lines)

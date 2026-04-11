@@ -182,7 +182,7 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
         s = matched[0]
         import subprocess
         from .profiles import build_launch_env, resume_cmd
-        env = build_launch_env(s.profile, {"cloak": config.integrations.cloak, "aiproxy": config.integrations.aiproxy})
+        env = build_launch_env(s.profile, {"textaccounts": config.integrations.textaccounts, "aiproxy": config.integrations.aiproxy})
         cmd = resume_cmd(s.id, s.name, s.profile, env, config.ui.claude_cmd)
         sys.exit(subprocess.run(cmd, env=env, cwd=s.repo_path).returncode)
 
