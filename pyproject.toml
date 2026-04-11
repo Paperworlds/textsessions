@@ -21,4 +21,9 @@ textsessions = "textsessions.cli:main"
 claude-sessions-index = "textsessions.cli:sessions_index_compat"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/textsessions"]
+packages = ["src/textsessions", "src/textaccounts"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
