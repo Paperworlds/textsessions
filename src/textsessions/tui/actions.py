@@ -308,9 +308,9 @@ class ActionsMixin:
         )
 
     def action_config_screen(self) -> None:
-        from .config_screen import ConfigApp
+        import subprocess
         with self.suspend():
-            ConfigApp(self._config).run()
+            subprocess.run([sys.executable, "-m", "textsessions", "view", "--config"])
         # Reload config from disk in case it changed
         from ..config import load
         self._config = load()
