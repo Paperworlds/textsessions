@@ -26,12 +26,17 @@ def main() -> None:
 
 @main.command()
 @click.option("--config", "config_mode", is_flag=True, help="Open repo config view")
-def view(config_mode: bool) -> None:
+@click.option("--select-file", hidden=True, default="", help="Internal: write selected repo label to this file on Enter")
+def view(config_mode: bool, select_file: str) -> None:
     """Launch the interactive TUI."""
     config = load()
     if config_mode:
         from .tui.config_screen import ConfigApp
-        ConfigApp(config).run()
+        app = ConfigApp(config)
+        app.run()
+        if select_file and app.selected_label:
+            from pathlib import Path
+            Path(select_file).write_text(app.selected_label)
         return
     if not config.repos:
         click.echo("No repos configured. Run: textsessions init")

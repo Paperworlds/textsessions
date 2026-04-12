@@ -210,6 +210,7 @@ class ConfigApp(App):
     """
 
     BINDINGS = [
+        Binding("enter", "select_repo", "Select"),
         Binding("e", "edit_label", "Label"),
         Binding("p", "edit_profile", "Profile"),
         Binding("d", "delete_repo", "Remove"),
@@ -220,6 +221,7 @@ class ConfigApp(App):
     def __init__(self, config: Config) -> None:
         super().__init__()
         self._config = config
+        self.selected_label: str = ""
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -333,3 +335,9 @@ class ConfigApp(App):
             self.notify(f"Added {repo_label}")
 
         self.push_screen(AddRepoModal(), handle)
+
+    def action_select_repo(self) -> None:
+        repo = self._current_repo()
+        if repo:
+            self.selected_label = repo.label
+            self.exit()
