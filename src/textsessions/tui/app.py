@@ -172,21 +172,21 @@ class TextSessionsApp(ActionsMixin, App):
     """
 
     BINDINGS = [
-        Binding("t", "tag_session", "Tag"),
-        Binding("p", "priority_session", "Priority"),
-        Binding("r", "rename_session", "Rename"),
-        Binding("d", "archive_session", "Archive"),
-        Binding("D", "delete_session_direct", "Delete"),
+        Binding("t", "tag_session", "Tag", show=False),
+        Binding("p", "priority_session", "Priority", show=False),
+        Binding("r", "rename_session", "Rename", show=False),
+        Binding("d", "archive_session", "Archive", show=False),
+        Binding("D", "delete_session_direct", "Delete", show=False),
+        Binding("x", "pin_session", "Pin", show=False),
+        Binding("y", "toggle_pins", "Pins", show=False),
+        Binding("a", "toggle_all", "All", show=False),
+        Binding("s", "toggle_sort", "Sort", show=False),
+        Binding("g", "toggle_ghosts", "Ghosts", show=False),
+        Binding("ctrl+r", "reindex", "Reindex", show=False),
+        Binding("escape", "clear_filter", "Clear", show=False),
 
-        Binding("x", "pin_session", "Pin"),
-        Binding("y", "toggle_pins", "Pins"),
-        Binding("n", "new_session", "New", show=True),
+        Binding("n", "new_session", "New"),
         Binding("/", "focus_filter", "Filter"),
-        Binding("a", "toggle_all", "All"),
-        Binding("s", "toggle_sort", "Sort"),
-        Binding("g", "toggle_ghosts", "Ghosts"),
-        Binding("ctrl+r", "reindex", "Reindex"),
-        Binding("escape", "clear_filter", "Clear filter"),
         Binding("c", "config_screen", "Config"),
         Binding("?", "show_help", "Help"),
         Binding("q", "quit", "Quit"),
@@ -202,10 +202,9 @@ class TextSessionsApp(ActionsMixin, App):
     _filtered: list[Session] = []
     _config: Config
 
-    def __init__(self, config: Config, config_mode: bool = False) -> None:
+    def __init__(self, config: Config) -> None:
         super().__init__()
         self._config = config
-        self._config_mode = config_mode
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -228,8 +227,6 @@ class TextSessionsApp(ActionsMixin, App):
         self.set_interval(5, self._refresh_proxy)
         self._refresh_proxy()
         self.query_one("#sessions-table", DataTable).focus()
-        if self._config_mode:
-            self.action_config_screen()
 
     def _reload_sessions(self) -> None:
         self._sessions = load_sessions(self._config)

@@ -1,13 +1,13 @@
-"""Config screen for managing repos in textsessions TUI."""
+"""Standalone config app for managing repos in textsessions."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from textual.app import ComposeResult
+from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, ScrollableContainer, Vertical
-from textual.screen import ModalScreen, Screen
+from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Footer, Header, Input, Label, Select, Static
 
 from ..config import Config, RepoConfig, load, save
@@ -156,10 +156,13 @@ class DeleteConfirmModal(ModalScreen[bool]):
         self.dismiss(event.button.id == "save")
 
 
-class ConfigScreen(Screen):
-    """Full screen for managing repo configuration."""
+class ConfigApp(App):
+    """Standalone app for managing repo configuration."""
 
     CSS = """
+    Screen {
+        layout: vertical;
+    }
     #config-main {
         layout: horizontal;
         height: 1fr;
@@ -185,6 +188,25 @@ class ConfigScreen(Screen):
     #config-detail {
         height: 1fr;
     }
+    #dialog {
+        background: $surface;
+        border: solid $primary;
+        padding: 1 2;
+        width: 60;
+        height: auto;
+    }
+    #title {
+        text-style: bold;
+        margin-bottom: 1;
+    }
+    #buttons {
+        margin-top: 1;
+        height: 3;
+        align: right middle;
+    }
+    Button {
+        margin-left: 1;
+    }
     """
 
     BINDINGS = [
@@ -192,8 +214,7 @@ class ConfigScreen(Screen):
         Binding("p", "edit_profile", "Profile"),
         Binding("d", "delete_repo", "Remove"),
         Binding("a", "add_repo", "Add"),
-        Binding("escape", "go_back", "Back"),
-        Binding("q", "go_back", "Quit"),
+        Binding("q", "quit", "Quit"),
     ]
 
     def __init__(self, config: Config) -> None:
@@ -237,7 +258,7 @@ class ConfigScreen(Screen):
             row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
         except Exception:
             return None
-        path = Path(str(row_key))
+        path = Path(row_key.value)
         for r in self._config.repos:
             if r.path == path:
                 return r
@@ -312,6 +333,3 @@ class ConfigScreen(Screen):
             self.notify(f"Added {repo_label}")
 
         self.push_screen(AddRepoModal(), handle)
-
-    def action_go_back(self) -> None:
-        self.dismiss(self._config)

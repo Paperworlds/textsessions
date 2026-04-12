@@ -29,12 +29,15 @@ def main() -> None:
 def view(config_mode: bool) -> None:
     """Launch the interactive TUI."""
     config = load()
-    if not config.repos and not config_mode:
+    if config_mode:
+        from .tui.config_screen import ConfigApp
+        ConfigApp(config).run()
+        return
+    if not config.repos:
         click.echo("No repos configured. Run: textsessions init")
         return
     from .tui.app import TextSessionsApp
-    app = TextSessionsApp(config, config_mode=config_mode)
-    app.run()
+    TextSessionsApp(config).run()
 
 
 @main.command()
