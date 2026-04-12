@@ -187,6 +187,7 @@ class TextSessionsApp(ActionsMixin, App):
         Binding("g", "toggle_ghosts", "Ghosts"),
         Binding("ctrl+r", "reindex", "Reindex"),
         Binding("escape", "clear_filter", "Clear filter"),
+        Binding("c", "config_screen", "Config"),
         Binding("?", "show_help", "Help"),
         Binding("q", "quit", "Quit"),
     ]
@@ -201,9 +202,10 @@ class TextSessionsApp(ActionsMixin, App):
     _filtered: list[Session] = []
     _config: Config
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, config_mode: bool = False) -> None:
         super().__init__()
         self._config = config
+        self._config_mode = config_mode
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -226,6 +228,8 @@ class TextSessionsApp(ActionsMixin, App):
         self.set_interval(5, self._refresh_proxy)
         self._refresh_proxy()
         self.query_one("#sessions-table", DataTable).focus()
+        if self._config_mode:
+            self.action_config_screen()
 
     def _reload_sessions(self) -> None:
         self._sessions = load_sessions(self._config)

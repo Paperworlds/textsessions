@@ -18,20 +18,23 @@ from .proxy import fmt_tokens, load_all_time, load_current_session
 from .sessions import CACHE_PATH, delete_session_from_index, filter_sessions, load_sessions, load_sessions_fast, sort_by_priority
 
 
-@click.group(invoke_without_command=True)
+@click.group()
 @click.version_option(__version__, "--version", "-V")
-@click.pass_context
-def main(ctx: click.Context) -> None:
+def main() -> None:
     """textsessions — TUI for Claude Code session management."""
-    if ctx.invoked_subcommand is None:
-        # Default: launch TUI
-        config = load()
-        if not config.repos:
-            click.echo("No repos configured. Run: textsessions init")
-            return
-        from .tui.app import TextSessionsApp
-        app = TextSessionsApp(config)
-        app.run()
+
+
+@main.command()
+@click.option("--config", "config_mode", is_flag=True, help="Open repo config view")
+def view(config_mode: bool) -> None:
+    """Launch the interactive TUI."""
+    config = load()
+    if not config.repos and not config_mode:
+        click.echo("No repos configured. Run: textsessions init")
+        return
+    from .tui.app import TextSessionsApp
+    app = TextSessionsApp(config, config_mode=config_mode)
+    app.run()
 
 
 @main.command()

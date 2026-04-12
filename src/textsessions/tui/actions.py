@@ -306,3 +306,13 @@ class ActionsMixin:
             NewSessionModal(profiles, default_profile, default_repo_path),
             handle,
         )
+
+    def action_config_screen(self) -> None:
+        from .config_screen import ConfigScreen
+
+        def handle(result) -> None:
+            if result is not None:
+                self._config = result
+                self._reload_sessions()
+
+        self.push_screen(ConfigScreen(self._config), handle)
