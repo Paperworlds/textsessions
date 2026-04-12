@@ -2,10 +2,16 @@
 
 ## Prerequisites
 
-Install textaccounts in editable mode (from the textsessions repo):
+Install textsessions with account support:
 
 ```sh
-uv pip install -e src/textaccounts
+pip install textsessions[accounts]
+```
+
+Or install textaccounts standalone:
+
+```sh
+pip install textaccounts
 ```
 
 Then install shell integration:

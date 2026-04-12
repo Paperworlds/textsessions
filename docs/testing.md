@@ -12,7 +12,7 @@ Walk through these before a public release. Each section is a user story — run
 
 ### Browse and filter
 
-- [ ] `textsessions` — TUI launches, shows session table
+- [ ] `textsessions view` — TUI launches, shows session table
 - [ ] `/` — filter input focuses, typing narrows the list
 - [ ] `#tag` in filter — filters to sessions with that tag
 - [ ] `a` — toggles between current-repo and all-repos view
@@ -141,7 +141,7 @@ Update `pyproject.toml` to pin the textaccounts dependency:
 ```toml
 [project.optional-dependencies]
 accounts = [
-    "textaccounts @ git+https://github.com/Paperworlds/textaccounts.git@v0.X.0",
+    "textaccounts @ git+https://github.com/paperworlds/textaccounts.git@v0.X.0",
 ]
 ```
 
@@ -162,11 +162,11 @@ textaccounts list && textaccounts status
 
 # with accounts
 uv tool install "textsessions[accounts]"
-textsessions
+textsessions view
 
 # without accounts
 uv tool install textsessions
-textsessions
+textsessions view
 ```
 
 ---

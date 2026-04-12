@@ -18,8 +18,13 @@ dependencies = [
 
 [project.optional-dependencies]
 accounts = [
-    "textaccounts @ git+https://github.com/Paperworlds/textaccounts.git@v0.2.0",
+    "textaccounts @ git+https://github.com/paperworlds/textaccounts.git@v0.2.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/paperworlds/textsessions"
+Repository = "https://github.com/paperworlds/textsessions"
+Issues = "https://github.com/paperworlds/textsessions/issues"
 
 [project.scripts]
 textsessions = "textsessions.cli:main"
@@ -34,7 +39,7 @@ packages = ["src/textsessions"]
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
-    "textaccounts @ git+https://github.com/Paperworlds/textaccounts.git@v0.2.0",
+    "textaccounts @ git+https://github.com/paperworlds/textaccounts.git@v0.2.0",
 ]
 
 [tool.pytest.ini_options]

@@ -5,7 +5,7 @@ A terminal UI and CLI for managing [Claude Code](https://claude.ai/code) session
 If you work with Claude across many projects, sessions accumulate fast. textsessions gives you a searchable, filterable view of all of them — with resume, tagging, priority, and cleanup built in.
 
 ```
-textsessions
+textsessions view
 ```
 
 ![TUI showing session list with repo, profile, tags, priority, and last-active columns]
@@ -21,8 +21,8 @@ textsessions
 - Claude Code CLI (`claude`)
 
 Optional integrations (auto-detected at runtime):
-- [textaccounts](#textaccounts) — native profile isolation (bundled in this repo)
-- [ai-proxy](https://github.com/pdonorio/claude-code-proxy) — local token proxy for usage tracking
+- [textaccounts](#textaccounts) — profile isolation (separate optional package)
+- [ai-proxy](https://github.com/paperworlds/claude-code-proxy) — local token proxy for usage tracking
 
 ---
 
@@ -32,7 +32,7 @@ Optional integrations (auto-detected at runtime):
 pip install textsessions
 ```
 
-With multi-account support ([textaccounts](https://github.com/Paperworlds/textaccounts)):
+With multi-account support ([textaccounts](https://github.com/paperworlds/textaccounts)):
 
 ```sh
 pip install textsessions[accounts]
@@ -41,7 +41,7 @@ pip install textsessions[accounts]
 Or from source:
 
 ```sh
-git clone https://github.com/Paperworlds/textsessions
+git clone https://github.com/paperworlds/textsessions
 cd textsessions
 pip install -e ".[accounts]"
 ```
@@ -58,14 +58,14 @@ textsessions init
 textsessions reindex
 
 # 3. Launch the TUI
-textsessions
+textsessions view
 ```
 
 ---
 
 ## TUI
 
-Launch with `textsessions` (or alias `ts`).
+Launch with `textsessions view` (or alias `ts`).
 
 Sessions are grouped by repo and sorted by last-active. The right panel shows full detail for the selected session, including token proxy stats if ai-proxy is running.
 
@@ -87,12 +87,29 @@ Sessions are grouped by repo and sorted by last-active. The right panel shows fu
 | `g` | Toggle ghosts & orphans only view |
 | `s` | Sort by priority instead of last-active |
 | `ctrl+r` | Reindex current repo |
+| `c` | Open repo config view |
 | `?` | Help |
 | `q` | Quit |
 
 ---
 
 ## CLI reference
+
+### View
+
+```sh
+textsessions view             # launch the TUI
+textsessions view --config    # open repo config view
+```
+
+### Add repos
+
+```sh
+textsessions add /path/to/repo                          # auto-label from dirname
+textsessions add /path/to/repo --label myrepo           # custom label
+textsessions add /path/to/repo --profile work           # assign a profile
+textsessions add /path/to/projects --recursive          # scan one level deep
+```
 
 ### Sessions
 
@@ -246,11 +263,11 @@ This lets you define fish functions (`claude-work`, `claude-personal`, etc.) tha
 
 ### ai-proxy
 
-If [ai-proxy](https://github.com/pdonorio/claude-code-proxy) is running on `localhost:7474`, textsessions automatically sets `ANTHROPIC_BASE_URL` before launching Claude. Token usage and cost appear in the TUI detail panel and `textsessions proxy`.
+If [ai-proxy](https://github.com/paperworlds/claude-code-proxy) is running on `localhost:7474`, textsessions automatically sets `ANTHROPIC_BASE_URL` before launching Claude. Token usage and cost appear in the TUI detail panel and `textsessions proxy`.
 
 ### textaccounts
 
-[textaccounts](https://github.com/Paperworlds/textaccounts) is an optional profile manager that isolates Claude accounts by pointing `CLAUDE_CONFIG_DIR` at separate config directories — keeping sessions, memory, and auth separate per profile.
+[textaccounts](https://github.com/paperworlds/textaccounts) is an optional profile manager that isolates Claude accounts by pointing `CLAUDE_CONFIG_DIR` at separate config directories — keeping sessions, memory, and auth separate per profile.
 
 Install with `pip install textsessions[accounts]` to enable. When configured, textsessions automatically injects `CLAUDE_CONFIG_DIR` before launching or resuming any session whose repo `profile` matches a registered profile name. Without textaccounts, you can still use custom commands (see Custom Commands section above) or a single default account.
 
@@ -336,9 +353,17 @@ Start with the ones that solve the most common pain points for heavy Claude Code
 
 ---
 
-## Part of Paperworlds
+## Roadmap
 
-textsessions is part of [Paperworlds](https://github.com/Paperworlds) — an open org building tools and games around AI agents and text interfaces.
+- [ ] Publish to PyPI
+- [ ] Upgrade to Python 3.13
+- [ ] Bash/zsh shell support (currently fish only)
+- [ ] `textsessions doctor` — validate config, check for stale paths
+- [ ] Session export to markdown
+
+## Part of paperworlds
+
+textsessions is part of [paperworlds](https://github.com/paperworlds) — an open org building tools and games around AI agents and text interfaces.
 
 ---
 
