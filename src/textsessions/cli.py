@@ -80,9 +80,61 @@ def _init_recursive(root: Path, profile: str) -> None:
 
 
 @main.command()
-def scan() -> None:
-    """Re-scan and update config (non-interactive)."""
-    run_init(interactive=False)
+@click.argument("path", type=click.Path(exists=True, file_okay=False))
+@click.option("--label", "-l", default="", help="Display name (default: directory basename)")
+@click.option("--profile", "-p", default="", help="Claude profile (default: auto-detect)")
+@click.option("--recursive", "-r", is_flag=True, help="Scan PATH for git repos and add all")
+def add(path: str, label: str, profile: str, recursive: bool) -> None:
+    """Add a repo (or directory of repos) to config."""
+    from rich.console import Console
+    from .config import detect_claude_dirs
+    from .indexer import reindex_repos
+
+    console = Console()
+    repo_path = Path(path).expanduser().resolve()
+
+    if not profile:
+        try:
+            from textaccounts.api import active_profile
+            profile = active_profile() or "default"
+        except ImportError:
+            profile = "default"
+
+    config = load()
+    existing_paths = {r.path for r in config.repos}
+
+    if recursive:
+        git_repos = sorted(p.parent for p in repo_path.rglob(".git") if p.is_dir())
+        if not git_repos:
+            console.print(f"[yellow]No git repos found under {repo_path}[/yellow]")
+            return
+        new_repos = []
+        for rp in git_repos:
+            if rp in existing_paths:
+                console.print(f"  [dim]skip[/dim] {rp.name}  (already configured)")
+                continue
+            rc = RepoConfig(path=rp, label=rp.name, profile=profile)
+            config.repos.append(rc)
+            new_repos.append(rc)
+            console.print(f"  [green]+[/green] {rp.name}  [dim]{rp}[/dim]")
+        if not new_repos:
+            console.print("[dim]Nothing new to add.[/dim]")
+            return
+        save(config)
+        claude_dirs = detect_claude_dirs()
+        total = reindex_repos(new_repos, claude_dirs)
+        console.print(f"\n[green]Added {len(new_repos)} repos ({total} sessions indexed).[/green]")
+    else:
+        if repo_path in existing_paths:
+            console.print(f"[yellow]Already configured:[/yellow] {repo_path}")
+            return
+        repo_label = label or repo_path.name
+        rc = RepoConfig(path=repo_path, label=repo_label, profile=profile)
+        config.repos.append(rc)
+        save(config)
+        claude_dirs = detect_claude_dirs()
+        total = reindex_repos([rc], claude_dirs)
+        console.print(f"[green]Added[/green] {repo_label} [dim]({total} sessions)[/dim]")
 
 
 @main.command()
