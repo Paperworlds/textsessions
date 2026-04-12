@@ -210,7 +210,6 @@ class ConfigApp(App):
     """
 
     BINDINGS = [
-        Binding("enter", "select_repo", "Select"),
         Binding("e", "edit_label", "Label"),
         Binding("p", "edit_profile", "Profile"),
         Binding("d", "delete_repo", "Remove"),
@@ -336,7 +335,7 @@ class ConfigApp(App):
 
         self.push_screen(AddRepoModal(), handle)
 
-    def action_select_repo(self) -> None:
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         repo = self._current_repo()
         if repo:
             self.selected_label = repo.label
