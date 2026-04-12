@@ -362,6 +362,7 @@ Start with the ones that solve the most common pain points for heavy Claude Code
 - [ ] Bash/zsh shell support (currently fish only)
 - [ ] `textsessions doctor` — validate config, check for stale paths
 - [ ] Session export to markdown
+- [ ] Refactor config screen from subprocess to pushed Screen (removes brief flash on `c` key)
 
 ## Part of paperworlds
 
