@@ -193,12 +193,18 @@ def _complete_session_names(ctx: click.Context, param: click.Parameter, incomple
               help="Resume a session by name or ID prefix.")
 @click.option("--names-only", "names_only", is_flag=True, hidden=True,
               help="Print session names one per line (for shell completion).")
-def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, by_priority: bool, limit: int, resume_name: str, names_only: bool) -> None:
+@click.option("--reindex", is_flag=True, help="Rebuild indexes from .jsonl before listing")
+def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, by_priority: bool, limit: int, resume_name: str, names_only: bool, reindex: bool) -> None:
     """Print session table (non-TUI, for scripting)."""
     config = load()
     if not config.repos:
         click.echo("No repos configured. Run: textsessions init")
         return
+
+    if reindex:
+        from .config import detect_claude_dirs
+        from .indexer import reindex_repos
+        reindex_repos(list(config.repos), detect_claude_dirs())
 
     if use_cwd:
         cwd = Path.cwd()

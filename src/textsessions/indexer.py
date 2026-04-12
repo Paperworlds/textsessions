@@ -18,6 +18,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+_HEX_RE = re.compile(r"^[0-9a-f]{5,8}$")
+
 import yaml
 
 STATE_DIR = Path.home() / ".local" / "state" / "claude-sessions"
@@ -227,6 +229,10 @@ def build_index(repo_key: str, pairs: list[str]) -> dict:
         for field in ("priority", "tags", "pinned", "archived", "name", "description"):
             if old.get(field):
                 entry[field] = old[field]
+
+        # Auto-rename: if name is still a hex stub and we have a custom title, upgrade it
+        if ct and _HEX_RE.match(entry["name"]):
+            entry["name"] = make_short_name(ct)
 
         new_index[sid] = entry
 

@@ -213,6 +213,55 @@ def test_build_index_preserves_all_user_fields(jsonl_dir, tmp_path):
     assert index2[sid].get("name") == "my-custom-name"
 
 
+def test_build_index_auto_renames_hex_sessions(tmp_path):
+    """build_index upgrades hex-stub names when custom-title exists in .jsonl."""
+    claude_dir = tmp_path / ".claude"
+    sessions_dir = tmp_path / "sessions"
+    sessions_dir.mkdir()
+    sid = "ab12cd" + "0" * 26  # 32-char hex ID → name will be "ab12c" (first 5)
+    lines = [
+        json.dumps({"type": "user", "timestamp": "2026-01-01T10:00:00Z",
+                    "message": {"content": "Help me with auth"}}),
+        json.dumps({"type": "custom-title", "timestamp": "2026-01-01T10:01:00Z",
+                    "customTitle": "Auth refactor for login flow"}),
+    ]
+    (sessions_dir / f"{sid}.jsonl").write_text("\n".join(lines))
+    state_dir = tmp_path / "state"
+    pairs = [f"{claude_dir}::{sessions_dir}"]
+    with patch("textsessions.indexer.STATE_DIR", state_dir), \
+         patch("textsessions.indexer.LEGACY_INDEX_DIR", tmp_path / "legacy"):
+        index = build_index("test-repo", pairs)
+    # Name should be derived from custom title, not the hex stub
+    assert index[sid]["name"] != sid[:5]
+    assert "auth" in index[sid]["name"].lower()
+
+
+def test_build_index_keeps_user_name_over_auto_rename(tmp_path):
+    """If user explicitly renamed a session, auto-rename does not overwrite."""
+    claude_dir = tmp_path / ".claude"
+    sessions_dir = tmp_path / "sessions"
+    sessions_dir.mkdir()
+    sid = "ab12cd" + "0" * 26
+    lines = [
+        json.dumps({"type": "user", "timestamp": "2026-01-01T10:00:00Z",
+                    "message": {"content": "Help me with auth"}}),
+        json.dumps({"type": "custom-title", "timestamp": "2026-01-01T10:01:00Z",
+                    "customTitle": "Auth refactor for login flow"}),
+    ]
+    (sessions_dir / f"{sid}.jsonl").write_text("\n".join(lines))
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+    # Pre-seed with a non-hex user-set name
+    existing = {sid: {"name": "my-auth-work", "profile": "default", "last_active": "2026-01-01 10:00", "slug": "old"}}
+    (state_dir / "test-repo.yaml").write_text(yaml.safe_dump(existing))
+    pairs = [f"{claude_dir}::{sessions_dir}"]
+    with patch("textsessions.indexer.STATE_DIR", state_dir), \
+         patch("textsessions.indexer.LEGACY_INDEX_DIR", tmp_path / "legacy"):
+        index = build_index("test-repo", pairs)
+    # User-set name preserved (not hex, so auto-rename doesn't trigger)
+    assert index[sid]["name"] == "my-auth-work"
+
+
 # ---------------------------------------------------------------------------
 # load_index / save_index
 # ---------------------------------------------------------------------------
