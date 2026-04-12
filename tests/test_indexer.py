@@ -236,8 +236,8 @@ def test_build_index_auto_renames_hex_sessions(tmp_path):
     assert "auth" in index[sid]["name"].lower()
 
 
-def test_build_index_keeps_user_name_over_auto_rename(tmp_path):
-    """If user explicitly renamed a session, auto-rename does not overwrite."""
+def test_build_index_name_follows_latest_custom_title(tmp_path):
+    """Name always derives from custom_title, even if old index had a different name."""
     claude_dir = tmp_path / ".claude"
     sessions_dir = tmp_path / "sessions"
     sessions_dir.mkdir()
@@ -251,15 +251,73 @@ def test_build_index_keeps_user_name_over_auto_rename(tmp_path):
     (sessions_dir / f"{sid}.jsonl").write_text("\n".join(lines))
     state_dir = tmp_path / "state"
     state_dir.mkdir()
-    # Pre-seed with a non-hex user-set name
+    # Pre-seed with an old name from a previous custom_title
+    existing = {sid: {"name": "old-auth-name", "profile": "default", "last_active": "2026-01-01 10:00", "slug": "old"}}
+    (state_dir / "test-repo.yaml").write_text(yaml.safe_dump(existing))
+    pairs = [f"{claude_dir}::{sessions_dir}"]
+    with patch("textsessions.indexer.STATE_DIR", state_dir), \
+         patch("textsessions.indexer.LEGACY_INDEX_DIR", tmp_path / "legacy"):
+        index = build_index("test-repo", pairs)
+    # custom_title is authoritative — name must derive from it
+    assert "auth" in index[sid]["name"].lower()
+    assert index[sid]["description"] == "Auth refactor for login flow"
+
+
+def test_build_index_preserves_name_without_custom_title(tmp_path):
+    """Without custom_title, old user-set name is preserved across reindexes."""
+    claude_dir = tmp_path / ".claude"
+    sessions_dir = tmp_path / "sessions"
+    sessions_dir.mkdir()
+    sid = "ab12cd" + "0" * 26
+    lines = [
+        json.dumps({"type": "user", "timestamp": "2026-01-01T10:00:00Z",
+                    "message": {"content": "Help me with auth"}}),
+    ]
+    (sessions_dir / f"{sid}.jsonl").write_text("\n".join(lines))
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
     existing = {sid: {"name": "my-auth-work", "profile": "default", "last_active": "2026-01-01 10:00", "slug": "old"}}
     (state_dir / "test-repo.yaml").write_text(yaml.safe_dump(existing))
     pairs = [f"{claude_dir}::{sessions_dir}"]
     with patch("textsessions.indexer.STATE_DIR", state_dir), \
          patch("textsessions.indexer.LEGACY_INDEX_DIR", tmp_path / "legacy"):
         index = build_index("test-repo", pairs)
-    # User-set name preserved (not hex, so auto-rename doesn't trigger)
+    # No custom_title → old name preserved
     assert index[sid]["name"] == "my-auth-work"
+
+
+def test_build_index_updates_name_when_custom_title_changes(tmp_path):
+    """Regression: when custom_title changes between reindexes, name must update."""
+    claude_dir = tmp_path / ".claude"
+    sessions_dir = tmp_path / "sessions"
+    sessions_dir.mkdir()
+    sid = "ab12cd" + "0" * 26
+    state_dir = tmp_path / "state"
+
+    # First index: custom_title is "ts"
+    lines = [
+        json.dumps({"type": "user", "timestamp": "2026-01-01T10:00:00Z",
+                    "message": {"content": "Help me with textsessions"}}),
+        json.dumps({"type": "custom-title", "timestamp": "2026-01-01T10:01:00Z",
+                    "customTitle": "ts"}),
+    ]
+    (sessions_dir / f"{sid}.jsonl").write_text("\n".join(lines))
+    pairs = [f"{claude_dir}::{sessions_dir}"]
+    with patch("textsessions.indexer.STATE_DIR", state_dir), \
+         patch("textsessions.indexer.LEGACY_INDEX_DIR", tmp_path / "legacy"):
+        index1 = build_index("test-repo", pairs)
+    assert index1[sid]["name"] == "ts"
+
+    # Now custom_title changes to "sessions" (user did /rename in Claude)
+    lines.append(json.dumps({"type": "custom-title", "timestamp": "2026-01-01T10:02:00Z",
+                             "customTitle": "sessions"}))
+    (sessions_dir / f"{sid}.jsonl").write_text("\n".join(lines))
+    with patch("textsessions.indexer.STATE_DIR", state_dir), \
+         patch("textsessions.indexer.LEGACY_INDEX_DIR", tmp_path / "legacy"):
+        index2 = build_index("test-repo", pairs)
+    # Name must update to match the new custom_title, not stay as old "ts"
+    assert index2[sid]["name"] == "sessions"
+    assert index2[sid]["description"] == "sessions"
 
 
 # ---------------------------------------------------------------------------

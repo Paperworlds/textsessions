@@ -226,13 +226,21 @@ def build_index(repo_key: str, pairs: list[str]) -> dict:
         if ct:
             entry["description"] = ct  # auto-set from custom_title; user-set description takes precedence below
 
-        for field in ("priority", "tags", "pinned", "archived", "name", "description"):
+        # Preserve user-set metadata from previous index
+        for field in ("priority", "tags", "pinned", "archived"):
             if old.get(field):
                 entry[field] = old[field]
 
-        # Auto-rename: if name is still a hex stub and we have a custom title, upgrade it
-        if ct and _HEX_RE.match(entry["name"]):
-            entry["name"] = make_short_name(ct)
+        # name/description: custom_title from .jsonl is authoritative (it's what
+        # Claude or `textsessions rename` last set). Only fall back to old values
+        # when there's no custom_title.
+        if ct:
+            entry["name"] = make_short_name(ct) or sid[:5]
+            entry["description"] = ct
+        else:
+            for field in ("name", "description"):
+                if old.get(field):
+                    entry[field] = old[field]
 
         new_index[sid] = entry
 
