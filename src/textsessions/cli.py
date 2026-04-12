@@ -267,6 +267,7 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
     console = Console()
     table = Table(show_header=True, header_style="bold")
     table.add_column("Name", style="bold")
+    table.add_column("ID", style="dim")
     table.add_column("Info", style="dim")
     table.add_column("Repo")
     table.add_column("Profile")
@@ -278,7 +279,7 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
         tags_str = " ".join(f"#{t}" for t in s.tags)
         pri = s.display_priority
         info = s.description or s.slug
-        table.add_row(s.name, info, s.repo_label, s.profile, tags_str, pri, s.last_active)
+        table.add_row(s.name, s.id[:8], info, s.repo_label, s.profile, tags_str, pri, s.last_active)
 
     console.print(table)
 
