@@ -42,5 +42,8 @@ dev = [
     "textaccounts @ git+https://github.com/paperworlds/textaccounts.git@v0.2.0",
 ]
 
+[tool.uv.sources]
+textaccounts = { path = "../textaccounts", editable = true }
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
