@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.5.2
+
+- `is_automated` property on Session — True for sessions tagged "worker" or "automated"
+- `show_automated` param on `filter_sessions()` — automated sessions hidden by default
+- Explicitly filtering `#worker` tag overrides the automated filter (shows them)
+
 ## v0.4.1
 
 - `textsessions rename <name> <new title>` — rename a session by name with tab-completion

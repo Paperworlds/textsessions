@@ -69,6 +69,11 @@ class Session:
     def is_archived(self) -> bool:
         return "archived" in self.tags
 
+    @property
+    def is_automated(self) -> bool:
+        """Session created by an automated runner (pp worker, CI, etc.)."""
+        return "worker" in self.tags or "automated" in self.tags
+
 
 def _load_yaml_index(yaml_path: Path) -> dict:
     if not yaml_path.exists():
@@ -209,11 +214,19 @@ def filter_sessions(
     profile: str = "",
     repo_label: str = "",
     show_archived: bool = False,
+    show_automated: bool = False,
     ghosts_only: bool = False,
 ) -> list[Session]:
     result = sessions
     if not show_archived:
         result = [s for s in result if not s.is_archived]
+    # Hide automated sessions unless explicitly requested via tag filter
+    automated_tags = {"worker", "automated"}
+    explicitly_requesting_automated = tag in automated_tags or (
+        query and any(w[1:] in automated_tags for w in query.lower().split() if w.startswith("#"))
+    )
+    if not show_automated and not explicitly_requesting_automated:
+        result = [s for s in result if not s.is_automated]
     if ghosts_only:
         result = [s for s in result if s.is_ghost or s.is_orphan]
     if query:
