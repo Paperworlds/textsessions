@@ -30,14 +30,14 @@ class RepoConfig:
 
 @dataclass
 class ProxyConfig:
-    cache_dir: Path = field(default_factory=lambda: Path.home() / ".cache" / "ai-proxy")
+    cache_dir: Path = field(default_factory=lambda: Path.home() / ".cache" / "textproxy")
 
 
 @dataclass
 class IntegrationsConfig:
     """Integration toggles. True means 'use if available' (auto-detected at runtime)."""
     textaccounts: bool = True  # set False to disable textaccounts even if configured
-    aiproxy: bool = True       # set False to disable ai-proxy even if running
+    textproxy: bool = True     # set False to disable textproxy even if running
 
 
 @dataclass
@@ -72,12 +72,12 @@ def load() -> Config:
     ]
     proxy_data = data.get("proxy", {})
     proxy = ProxyConfig(
-        cache_dir=Path(proxy_data.get("cache_dir", str(Path.home() / ".cache" / "ai-proxy")))
+        cache_dir=Path(proxy_data.get("cache_dir", str(Path.home() / ".cache" / "textproxy")))
     )
     integrations_data = data.get("integrations", {})
     integrations = IntegrationsConfig(
         textaccounts=integrations_data.get("textaccounts", True),
-        aiproxy=integrations_data.get("aiproxy", True),
+        textproxy=integrations_data.get("textproxy", integrations_data.get("aiproxy", True)),
     )
     ui_data = data.get("ui", {})
     ui = UiConfig(
@@ -106,7 +106,7 @@ def save(config: Config) -> None:
         },
         "integrations": {
             "textaccounts": config.integrations.textaccounts,
-            "aiproxy": config.integrations.aiproxy,
+            "textproxy": config.integrations.textproxy,
         },
         "ui": {
             "startup_repo": config.ui.startup_repo,

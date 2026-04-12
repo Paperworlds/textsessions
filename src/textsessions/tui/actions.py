@@ -246,7 +246,7 @@ class ActionsMixin:
         resume_id = s.id
         env = build_launch_env(profile, {
             "textaccounts": self._config.integrations.textaccounts,
-            "aiproxy": self._config.integrations.aiproxy,
+            "textproxy": self._config.integrations.textproxy,
         })
         cmd = resume_cmd(resume_id, s.name, profile, env, self._config.ui.claude_cmd)
         with self.suspend():
@@ -279,7 +279,7 @@ class ActionsMixin:
             import shlex
             env = build_launch_env(result.profile, {
                 "textaccounts": self._config.integrations.textaccounts,
-                "aiproxy": self._config.integrations.aiproxy,
+                "textproxy": self._config.integrations.textproxy,
             })
             if "CLAUDE_CONFIG_DIR" in env:
                 base_cmd = "claude"

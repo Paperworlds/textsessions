@@ -22,7 +22,7 @@ textsessions view
 
 Optional integrations (auto-detected at runtime):
 - [textaccounts](#textaccounts) — profile isolation (separate optional package)
-- [ai-proxy](https://github.com/paperworlds/claude-code-proxy) — local token proxy for usage tracking
+- [textproxy](https://github.com/paperworlds/textproxy) — local token proxy for tracking context consumption
 
 ---
 
@@ -67,7 +67,7 @@ textsessions view
 
 Launch with `textsessions view` (or alias `ts`).
 
-Sessions are grouped by repo and sorted by last-active. The right panel shows full detail for the selected session, including token proxy stats if ai-proxy is running.
+Sessions are grouped by repo and sorted by last-active. The right panel shows full detail for the selected session, including token proxy stats if textproxy is running.
 
 ### Keyboard shortcuts
 
@@ -205,7 +205,7 @@ textsessions tree --repo mono --include-archived
 textsessions proxy    # token usage + cost for today, by model
 ```
 
-Reads from ai-proxy's cache. Shows nothing if ai-proxy is not running.
+Reads from textproxy's cache. Shows nothing if textproxy is not running.
 
 ### Config
 
@@ -239,10 +239,10 @@ ai_search_profile = "claude" # command used for `textsessions search`
 
 [integrations]
 textaccounts = true  # use textaccounts for profile isolation if configured (see below)
-aiproxy = true       # inject ANTHROPIC_BASE_URL if ai-proxy is running on :7474
+textproxy = true     # inject ANTHROPIC_BASE_URL if textproxy is running on :7474
 
 [proxy]
-cache_dir = "~/.cache/ai-proxy"
+cache_dir = "~/.cache/textproxy"
 ```
 
 ### Profiles and the `claude_cmd` template
@@ -261,9 +261,11 @@ This lets you define fish functions (`claude-work`, `claude-personal`, etc.) tha
 
 ## Integrations
 
-### ai-proxy
+### textproxy
 
-If [ai-proxy](https://github.com/paperworlds/claude-code-proxy) is running on `localhost:7474`, textsessions automatically sets `ANTHROPIC_BASE_URL` before launching Claude. Token usage and cost appear in the TUI detail panel and `textsessions proxy`.
+[textproxy](https://github.com/paperworlds/textproxy) is a companion paperworlds project — a lightweight local MITM proxy that captures token consumption stats from Claude Code API traffic. It gives subscription users (Claude Team, Claude.ai) visibility into how much context window each session is actually consuming, without modifying Claude Code itself.
+
+If textproxy is running on `localhost:7474`, textsessions automatically sets `ANTHROPIC_BASE_URL` before launching Claude. Token usage and cost appear in the TUI detail panel and `textsessions proxy`.
 
 ### textaccounts
 
@@ -320,7 +322,7 @@ textaccounts view                        # interactive profile view
 textaccounts install                     # install shell integration
 ```
 
-Set `textaccounts = false` under `[integrations]` to disable profile injection entirely.
+Set `textaccounts = false` or `textproxy = false` under `[integrations]` to disable either integration.
 
 ---
 

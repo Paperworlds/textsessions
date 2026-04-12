@@ -14,8 +14,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from textsessions.profiles import (
-    aiproxy_available,
-    aiproxy_running,
+    textproxy_available,
+    textproxy_running,
     build_launch_env,
     textaccounts_available,
     list_textaccounts_profiles,
@@ -51,23 +51,23 @@ def test_textaccounts_available_false_when_not_installed():
 
 
 # ---------------------------------------------------------------------------
-# aiproxy_running
+# textproxy_running
 # ---------------------------------------------------------------------------
 
 
-def test_aiproxy_running_false():
-    """aiproxy_running returns False when nothing is listening on 7474."""
+def test_textproxy_running_false():
+    """textproxy_running returns False when nothing is listening on 7474."""
     with patch("textsessions.profiles.socket.create_connection", side_effect=OSError):
-        assert aiproxy_running() is False
+        assert textproxy_running() is False
 
 
-def test_aiproxy_running_true():
-    """aiproxy_running returns True when something is listening on 7474."""
+def test_textproxy_running_true():
+    """textproxy_running returns True when something is listening on 7474."""
     mock_conn = MagicMock()
     mock_conn.__enter__ = lambda s: s
     mock_conn.__exit__ = MagicMock(return_value=False)
     with patch("textsessions.profiles.socket.create_connection", return_value=mock_conn):
-        assert aiproxy_running() is True
+        assert textproxy_running() is True
 
 
 # ---------------------------------------------------------------------------
@@ -85,9 +85,9 @@ def test_build_launch_env_sets_claude_config_dir():
         patch("textsessions.profiles.textaccounts_available", return_value=True),
         patch("textsessions.profiles._ta_env_for_profile", return_value={"CLAUDE_CONFIG_DIR": "/path/to/work"}),
         patch("textsessions.profiles.os.environ", CLEAN_ENV),
-        patch("textsessions.profiles.aiproxy_running", return_value=False),
+        patch("textsessions.profiles.textproxy_running", return_value=False),
     ):
-        env = build_launch_env("work", {"textaccounts": True, "aiproxy": False})
+        env = build_launch_env("work", {"textaccounts": True, "textproxy": False})
 
     assert env["CLAUDE_CONFIG_DIR"] == "/path/to/work"
 
@@ -97,9 +97,9 @@ def test_build_launch_env_no_config_dir_when_not_installed():
     with (
         patch("textsessions.profiles._HAS_TEXTACCOUNTS", False),
         patch("textsessions.profiles.os.environ", CLEAN_ENV),
-        patch("textsessions.profiles.aiproxy_running", return_value=False),
+        patch("textsessions.profiles.textproxy_running", return_value=False),
     ):
-        env = build_launch_env("work", {"textaccounts": True, "aiproxy": False})
+        env = build_launch_env("work", {"textaccounts": True, "textproxy": False})
 
     assert "CLAUDE_CONFIG_DIR" not in env
 
@@ -109,9 +109,9 @@ def test_build_launch_env_no_config_dir_when_disabled():
     with (
         patch("textsessions.profiles._HAS_TEXTACCOUNTS", True),
         patch("textsessions.profiles.os.environ", CLEAN_ENV),
-        patch("textsessions.profiles.aiproxy_running", return_value=False),
+        patch("textsessions.profiles.textproxy_running", return_value=False),
     ):
-        env = build_launch_env("work", {"textaccounts": False, "aiproxy": False})
+        env = build_launch_env("work", {"textaccounts": False, "textproxy": False})
 
     assert "CLAUDE_CONFIG_DIR" not in env
 
@@ -123,9 +123,9 @@ def test_build_launch_env_unknown_profile_no_crash():
         patch("textsessions.profiles.textaccounts_available", return_value=True),
         patch("textsessions.profiles._ta_env_for_profile", side_effect=ValueError("not found")),
         patch("textsessions.profiles.os.environ", CLEAN_ENV),
-        patch("textsessions.profiles.aiproxy_running", return_value=False),
+        patch("textsessions.profiles.textproxy_running", return_value=False),
     ):
-        env = build_launch_env("nope", {"textaccounts": True, "aiproxy": False})
+        env = build_launch_env("nope", {"textaccounts": True, "textproxy": False})
 
     assert "CLAUDE_CONFIG_DIR" not in env
 
@@ -137,35 +137,35 @@ def test_build_launch_env_default_profile_no_config_dir():
         patch("textsessions.profiles.textaccounts_available", return_value=True),
         patch("textsessions.profiles._ta_env_for_profile", return_value={}),
         patch("textsessions.profiles.os.environ", CLEAN_ENV),
-        patch("textsessions.profiles.aiproxy_running", return_value=False),
+        patch("textsessions.profiles.textproxy_running", return_value=False),
     ):
-        env = build_launch_env("default", {"textaccounts": True, "aiproxy": False})
+        env = build_launch_env("default", {"textaccounts": True, "textproxy": False})
 
     assert "CLAUDE_CONFIG_DIR" not in env
 
 
-def test_build_launch_env_with_aiproxy():
-    """When ai-proxy is available and running, ANTHROPIC_BASE_URL is set."""
+def test_build_launch_env_with_textproxy():
+    """When textproxy is available and running, ANTHROPIC_BASE_URL is set."""
     with (
         patch("textsessions.profiles._HAS_TEXTACCOUNTS", False),
         patch("textsessions.profiles.os.environ", CLEAN_ENV),
-        patch("textsessions.profiles.shutil.which", side_effect=lambda cmd: "/usr/bin/ai-proxy" if cmd == "ai-proxy" else None),
-        patch("textsessions.profiles.aiproxy_running", return_value=True),
+        patch("textsessions.profiles.shutil.which", side_effect=lambda cmd: "/usr/bin/textproxy" if cmd == "textproxy" else None),
+        patch("textsessions.profiles.textproxy_running", return_value=True),
     ):
-        env = build_launch_env("default", {"textaccounts": False, "aiproxy": True})
+        env = build_launch_env("default", {"textaccounts": False, "textproxy": True})
 
     assert env["ANTHROPIC_BASE_URL"] == "http://localhost:7474"
 
 
-def test_build_launch_env_aiproxy_not_running():
-    """When ai-proxy is installed but not running, ANTHROPIC_BASE_URL is not set."""
+def test_build_launch_env_textproxy_not_running():
+    """When textproxy is installed but not running, ANTHROPIC_BASE_URL is not set."""
     with (
         patch("textsessions.profiles._HAS_TEXTACCOUNTS", False),
         patch("textsessions.profiles.os.environ", CLEAN_ENV),
-        patch("textsessions.profiles.shutil.which", side_effect=lambda cmd: "/usr/bin/ai-proxy" if cmd == "ai-proxy" else None),
-        patch("textsessions.profiles.aiproxy_running", return_value=False),
+        patch("textsessions.profiles.shutil.which", side_effect=lambda cmd: "/usr/bin/textproxy" if cmd == "textproxy" else None),
+        patch("textsessions.profiles.textproxy_running", return_value=False),
     ):
-        env = build_launch_env("default", {"textaccounts": False, "aiproxy": True})
+        env = build_launch_env("default", {"textaccounts": False, "textproxy": True})
 
     assert "ANTHROPIC_BASE_URL" not in env
 

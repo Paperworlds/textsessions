@@ -1,8 +1,8 @@
 """Token proxy stats reader for textsessions.
 
-Reads from claude-context-proxy cache files:
-  ~/.cache/ai-proxy/session.json   — current session
-  ~/.cache/ai-proxy/history.jsonl  — all-time history
+Reads from textproxy cache files:
+  ~/.cache/textproxy/session.json   — current session
+  ~/.cache/textproxy/history.jsonl  — all-time history
 """
 
 from __future__ import annotations

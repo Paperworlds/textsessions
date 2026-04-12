@@ -40,14 +40,14 @@ except ImportError:
         return {}
 
 
-# --- ai-proxy integration ---------------------------------------------------
+# --- textproxy integration ---------------------------------------------------
 
-def aiproxy_available() -> bool:
-    """True if ai-proxy binary is on PATH."""
-    return shutil.which("ai-proxy") is not None
+def textproxy_available() -> bool:
+    """True if textproxy binary is on PATH."""
+    return shutil.which("textproxy") is not None
 
 
-def aiproxy_running() -> bool:
+def textproxy_running() -> bool:
     """True if localhost:7474 is responding (quick socket check, <100ms timeout)."""
     try:
         with socket.create_connection(("localhost", 7474), timeout=0.1):
@@ -103,8 +103,8 @@ def build_launch_env(profile: str, integrations_enabled: dict[str, bool]) -> dic
             except ValueError:
                 pass  # profile not found in textaccounts — fall through to tier 2/3
 
-    if integrations_enabled.get("aiproxy", True):
-        if aiproxy_available() and aiproxy_running():
+    if integrations_enabled.get("textproxy", True):
+        if textproxy_available() and textproxy_running():
             env["ANTHROPIC_BASE_URL"] = "http://localhost:7474"
 
     return env
