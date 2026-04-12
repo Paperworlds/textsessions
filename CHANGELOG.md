@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.5.3
+
+- Rename `ai-proxy` → `textproxy` across codebase to match [paperworlds/textproxy](https://github.com/paperworlds/textproxy)
+- Auto-rename: `reindex` now upgrades hex-stub session names when a `/rename` custom title exists in the `.jsonl`
+- `textsessions sessions --reindex` — rebuild indexes from `.jsonl` before listing
+- `--current-folder` already auto-reindexes the matched repo; `--reindex` covers all other repos
+- TUI fix: filter input height restored to 3 rows (was broken at 1)
+
 ## v0.5.2
 
 - `is_automated` property on Session — True for sessions tagged "worker" or "automated"

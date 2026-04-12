@@ -201,11 +201,6 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
         click.echo("No repos configured. Run: textsessions init")
         return
 
-    if reindex:
-        from .config import detect_claude_dirs
-        from .indexer import reindex_repos
-        reindex_repos(list(config.repos), detect_claude_dirs())
-
     if use_cwd:
         cwd = Path.cwd()
         best: RepoConfig | None = None
@@ -224,7 +219,7 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
             click.echo("Run: textsessions init", err=True)
             sys.exit(1)
         repo = best.label
-        # Auto-reindex so the list is always current
+        # Auto-reindex the matched repo so the list is always current
         from .config import detect_claude_dirs
         from .indexer import build_index
         rk = repo_key(best.path)
@@ -235,6 +230,10 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
         ]
         if pairs:
             build_index(rk, pairs)
+    elif reindex:
+        from .config import detect_claude_dirs
+        from .indexer import reindex_repos
+        reindex_repos(list(config.repos), detect_claude_dirs())
 
     all_sessions = load_sessions_fast(config) if resume_name else load_sessions(config)
 
