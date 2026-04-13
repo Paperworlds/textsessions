@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.5.4
+
+- `textsessions doctor` — validates integrations, tool availability, profile wiring, and session indexes in one command
+- Fix: `just install` now includes `.[accounts]` extra — `textaccounts` was missing from the tool venv, silently breaking profile injection on resume
+- Fix: reindex updates `name`/`description` when `/rename` custom title changes (was reverting to old name)
+- Session ID (first 8 chars) shown in `textsessions sessions` table
+- Config screen: Enter opens edit-label modal instead of doing nothing; subprocess flash documented in roadmap
+
 ## v0.5.3
 
 - Rename `ai-proxy` → `textproxy` across codebase to match [paperworlds/textproxy](https://github.com/paperworlds/textproxy)
