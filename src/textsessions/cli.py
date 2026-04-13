@@ -347,7 +347,7 @@ def proxy() -> None:
         console.print(f"  Requests: [green]{current.requests}[/green]")
         console.print(f"  Cost:     [green]${current.cost_usd:.4f}[/green]")
     else:
-        console.print("  [dim]No proxy data (is textproxy running?)[/dim]")
+        console.print("  [dim]No proxy data — run `textsessions doctor` to diagnose[/dim]")
 
     console.print("\n[bold]All-time totals[/bold]")
     console.print(f"  Input:    {fmt_tokens(all_time.total_input_tokens)}")

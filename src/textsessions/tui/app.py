@@ -100,7 +100,7 @@ class SessionDetail(Static):
                 f"  Requests: [green]{stats.requests}[/green]         Cost:   [green]${stats.cost_usd:.3f}[/green]",
             ]
         else:
-            lines.append("  [dim]Proxy not running or no data[/dim]")
+            lines.append("  [dim]Proxy not running or no data — run `textsessions doctor` to diagnose[/dim]")
 
         # Show textaccounts hint when not configured and session has a non-default profile
         if s.profile != "default" and not textaccounts_available():
