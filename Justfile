@@ -41,7 +41,7 @@ check-completions:
         exit 1
     fi
 
-# Install shell completions (auto-detects fish/zsh/bash)
+# Install shell completions and aliases (auto-detects fish/zsh/bash)
 install-completions: check-completions
     #!/usr/bin/env sh
     shell=$(basename "$SHELL")
@@ -50,6 +50,11 @@ install-completions: check-completions
             dest="$HOME/.config/fish/completions/textsessions.fish"
             cp completions/textsessions.fish "$dest"
             echo "Installed fish completions → $dest"
+            mkdir -p "$HOME/.config/fish/functions"
+            for f in completions/functions/*.fish; do
+                cp "$f" "$HOME/.config/fish/functions/$(basename $f)"
+                echo "Installed fish function → $HOME/.config/fish/functions/$(basename $f)"
+            done
             ;;
         zsh)
             dest="${ZDOTDIR:-$HOME}/.zsh/completions/_textsessions"

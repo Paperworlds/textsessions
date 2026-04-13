@@ -12,6 +12,8 @@ except: pass
 
 # Top-level commands
 complete -c textsessions -f -n "__fish_use_subcommand" -a "init"          -d "Initialize configuration"
+complete -c textsessions -f -n "__fish_use_subcommand" -a "add"            -d "Add a repo to configuration"
+complete -c textsessions -f -n "__fish_use_subcommand" -a "view"           -d "Launch the interactive TUI"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "scan"           -d "Scan for sessions"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "scan-ghosts"    -d "Scan for ghost/orphan sessions"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "sessions"       -d "List sessions"
@@ -20,6 +22,7 @@ complete -c textsessions -f -n "__fish_use_subcommand" -a "index"          -d "B
 complete -c textsessions -f -n "__fish_use_subcommand" -a "rename"         -d "Rename a session"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "tag"            -d "Add or remove tags on a session"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "proxy"          -d "Show proxy stats"
+complete -c textsessions -f -n "__fish_use_subcommand" -a "doctor"         -d "Check integrations and config for problems"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "config"         -d "Show config"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "profile"        -d "Manage profiles"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "search"         -d "Search sessions using natural language (AI-powered)"
