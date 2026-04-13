@@ -69,11 +69,13 @@ Launch with `textsessions view` (or alias `ts`).
 
 Sessions are grouped by repo and sorted by last-active. The right panel shows full detail for the selected session, including token proxy stats if textproxy is running.
 
+When resuming a session inside tmux, the tmux window is automatically renamed to the session name for easy identification across panes.
+
 ### Keyboard shortcuts
 
 | Key | Action |
 |-----|--------|
-| `Enter` | Resume session (suspends TUI, launches Claude, returns) |
+| `Enter` | Resume session (suspends TUI, launches Claude, returns; renames tmux window) |
 | `n` | New session (profile, repo, optional name) |
 | `/` | Filter by name, description, or slug |
 | `a` | Toggle: current repo ↔ all repos |
@@ -362,7 +364,8 @@ Start with the ones that solve the most common pain points for heavy Claude Code
 - [ ] Bash/zsh shell support (currently fish only)
 - [ ] `textsessions doctor` — validate config, check for stale paths
 - [ ] Session export to markdown
-- [ ] Refactor config screen from subprocess to pushed Screen (removes brief flash on `c` key)
+- [ ] Refactor config screen from subprocess to pushed Screen (removes brief flash on `c` key, enables Enter-to-filter)
+- [ ] Polish rename flow — reindex now auto-renames hex sessions from `/rename`, but edge cases remain: TUI `r` key doesn't update the tmux window name, stale tab-completion names after rename, and `auto-rename --dry-run` output could be clearer
 
 ## Part of paperworlds
 

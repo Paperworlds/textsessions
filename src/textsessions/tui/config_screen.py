@@ -220,7 +220,6 @@ class ConfigApp(App):
     def __init__(self, config: Config) -> None:
         super().__init__()
         self._config = config
-        self.selected_label: str = ""
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -336,7 +335,5 @@ class ConfigApp(App):
         self.push_screen(AddRepoModal(), handle)
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        repo = self._current_repo()
-        if repo:
-            self.selected_label = repo.label
-            self.exit()
+        """Enter on a row opens edit-label modal (same as 'e')."""
+        self.action_edit_label()

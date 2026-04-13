@@ -310,27 +310,16 @@ class ActionsMixin:
     def action_config_screen(self) -> None:
         import shutil
         import subprocess
-        import tempfile
         ts_bin = shutil.which("textsessions")
         if not ts_bin:
             self.notify("textsessions not found on PATH", severity="error")
             return
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tf:
-            selection_file = tf.name
         with self.suspend():
-            subprocess.run([ts_bin, "view", "--config", "--select-file", selection_file],
-                           stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+            subprocess.run(
+                [ts_bin, "view", "--config"],
+                stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr,
+            )
         # Reload config from disk in case it changed
         from ..config import load
         self._config = load()
         self._reload_sessions()
-        # If a repo was selected, filter to it
-        try:
-            label = Path(selection_file).read_text().strip()
-            if label:
-                self._repo_filter = label
-                self._apply_filter()
-        except FileNotFoundError:
-            pass
-        finally:
-            Path(selection_file).unlink(missing_ok=True)

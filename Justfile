@@ -5,9 +5,9 @@ default:
 test:
     uv run pytest -x -q
 
-# Install as editable uv tool (no venv required)
+# Install as editable uv tool with accounts extra (no venv required)
 install:
-    uv tool install -e . --force
+    uv tool install -e ".[accounts]" --force --python 3.13
 
 # Build distribution
 build:

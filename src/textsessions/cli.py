@@ -26,17 +26,12 @@ def main() -> None:
 
 @main.command()
 @click.option("--config", "config_mode", is_flag=True, help="Open repo config view")
-@click.option("--select-file", hidden=True, default="", help="Internal: write selected repo label to this file on Enter")
-def view(config_mode: bool, select_file: str) -> None:
+def view(config_mode: bool) -> None:
     """Launch the interactive TUI."""
     config = load()
     if config_mode:
         from .tui.config_screen import ConfigApp
-        app = ConfigApp(config)
-        app.run()
-        if select_file and app.selected_label:
-            from pathlib import Path
-            Path(select_file).write_text(app.selected_label)
+        ConfigApp(config).run()
         return
     if not config.repos:
         click.echo("No repos configured. Run: textsessions init")
@@ -933,6 +928,115 @@ def tree_cmd(output: str, repo_label: str, fmt: str, include_archived: bool) -> 
     else:
         Path(output).write_text(text)
         click.echo(f"Written to {output}")
+
+
+# ---------------------------------------------------------------------------
+# Doctor command
+# ---------------------------------------------------------------------------
+
+@main.command("doctor")
+def doctor_cmd() -> None:
+    """Check integrations, config, and profile wiring for common problems."""
+    import shutil
+    from rich.console import Console
+
+    console = Console()
+    ok = True
+
+    def check(label: str, passed: bool, detail: str = "", fix: str = "") -> None:
+        nonlocal ok
+        if passed:
+            console.print(f"  [green]✓[/green]  {label}" + (f"  [dim]{detail}[/dim]" if detail else ""))
+        else:
+            ok = False
+            console.print(f"  [red]✗[/red]  {label}" + (f"  [dim]{detail}[/dim]" if detail else ""))
+            if fix:
+                console.print(f"       [yellow]→ {fix}[/yellow]")
+
+    config = load()
+    console.print()
+    console.print("[bold]Config[/bold]")
+    check("Config file exists", CONFIG_PATH.exists(), str(CONFIG_PATH),
+          fix=f"Run: textsessions init")
+    check("At least one repo configured", bool(config.repos),
+          fix="Run: textsessions add /path/to/repo")
+
+    console.print()
+    console.print("[bold]Tools[/bold]")
+    claude_bin = shutil.which("claude")
+    check("claude on PATH", bool(claude_bin), claude_bin or "",
+          fix="Install Claude Code: https://claude.ai/code")
+    fish_bin = shutil.which("fish")
+    check("fish on PATH", bool(fish_bin), fish_bin or "",
+          fix="Install fish shell (required for resume/launch): https://fishshell.com")
+
+    console.print()
+    console.print("[bold]textaccounts[/bold]")
+    try:
+        from textaccounts.api import available as ta_available, env_for_profile, list_profiles
+        has_ta = True
+    except ImportError:
+        has_ta = False
+        ta_available = lambda: False  # noqa: E731
+        list_profiles = lambda: []  # noqa: E731
+        env_for_profile = lambda p: {}  # noqa: E731
+
+    ta_enabled = config.integrations.textaccounts
+    check("textaccounts importable", has_ta,
+          fix="Reinstall: uv tool install -e '.[accounts]' --force --python 3.13")
+    if has_ta:
+        check("textaccounts available (profiles registered)", ta_available(),
+              fix="Run: textaccounts adopt <name> <path>")
+        if ta_available():
+            profiles = list_profiles()
+            check("profiles registered", bool(profiles), ", ".join(profiles) if profiles else "none")
+
+    console.print()
+    console.print("[bold]textproxy[/bold]")
+    from .profiles import textproxy_available, textproxy_running
+    tp_enabled = config.integrations.textproxy
+    check("textproxy on PATH", textproxy_available(),
+          fix="Install textproxy: https://github.com/paperworlds/textproxy")
+    if textproxy_available():
+        check("textproxy running on :7474", textproxy_running(),
+              fix="Start textproxy, or set textproxy = false under [integrations] to suppress")
+    if not tp_enabled:
+        console.print("  [dim]  (disabled in config)[/dim]")
+
+    console.print()
+    console.print("[bold]Repo profiles[/bold]")
+    profiles_in_use = {r.profile for r in config.repos}
+    if has_ta and ta_available():
+        registered = set(list_profiles())
+        for profile in sorted(profiles_in_use):
+            resolved = bool(env_for_profile(profile)) if profile in registered else False
+            check(
+                f"profile '{profile}' resolves via textaccounts",
+                resolved,
+                fix=f"Run: textaccounts adopt {profile} <path-to-config-dir>",
+            )
+    else:
+        for profile in sorted(profiles_in_use):
+            tpl = config.ui.claude_cmd
+            cmd = tpl.format(profile=profile) if "{profile}" in tpl else tpl
+            on_path = bool(shutil.which(cmd))
+            check(f"profile '{profile}' → '{cmd}' on PATH", on_path,
+                  fix=f"Define a fish function named '{cmd}' or install textaccounts")
+
+    console.print()
+    console.print("[bold]Session indexes[/bold]")
+    from .config import STATE_DIR
+    check("Index directory exists", STATE_DIR.exists(), str(STATE_DIR),
+          fix="Run: textsessions reindex")
+    if STATE_DIR.exists():
+        yaml_files = list(STATE_DIR.glob("*.yaml"))
+        check("At least one index file", bool(yaml_files), f"{len(yaml_files)} repo(s)")
+
+    console.print()
+    if ok:
+        console.print("[green]All checks passed.[/green]\n")
+    else:
+        console.print("[yellow]Some checks failed — see fixes above.[/yellow]\n")
 
 
 # ---------------------------------------------------------------------------
