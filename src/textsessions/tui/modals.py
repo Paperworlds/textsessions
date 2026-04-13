@@ -70,15 +70,17 @@ class PriorityModal(ModalScreen[str | None]):
     def __init__(self, session_name: str, current_priority: str) -> None:
         super().__init__()
         self._session_name = session_name
-        self._current = current_priority
+        self._current = str(current_priority) if current_priority else ""
 
     def compose(self) -> ComposeResult:
         options = [(label, val) for label, val in self.PRIORITIES]
         with Vertical(id="dialog"):
             yield Label(f"[bold]Priority[/bold] — {self._session_name}", id="title")
             yield Static(f"Current: {self._current or '(none)'}", id="current")
+            valid_values = {val for _, val in self.PRIORITIES}
+            initial = self._current if self._current in valid_values else "clear"
             yield Select(options, id="priority-select", allow_blank=False,
-                         value=self._current if self._current else Select.BLANK)
+                         value=initial)
             with Horizontal(id="buttons"):
                 yield Button("Save", variant="primary", id="save")
                 yield Button("Cancel", id="cancel")
@@ -247,7 +249,7 @@ class NewSessionModal(ModalScreen[NewSessionResult | None]):
     ]
 
     PRIORITIES = [
-        ("(none)", ""),
+        ("(none)", "none"),
         ("H0 — critical", "H0"),
         ("1 — high", "1"),
         ("2 — medium", "2"),
@@ -267,7 +269,7 @@ class NewSessionModal(ModalScreen[NewSessionResult | None]):
             yield Label("Name (optional):")
             yield Input(placeholder="e.g. refactor-auth", id="name-input")
             yield Label("Priority:")
-            yield Select(self.PRIORITIES, id="priority-select", allow_blank=False, value="")
+            yield Select(self.PRIORITIES, id="priority-select", allow_blank=False, value="none")
             yield Label("Profile:")
             yield Select(profile_options, id="profile-select", allow_blank=False,
                          value=self._default_profile)
@@ -280,7 +282,7 @@ class NewSessionModal(ModalScreen[NewSessionResult | None]):
             name = self.query_one("#name-input", Input).value.strip()
             priority_val = self.query_one("#priority-select", Select).value
             profile_val = self.query_one("#profile-select", Select).value
-            priority = str(priority_val) if priority_val and priority_val is not Select.BLANK else ""
+            priority = str(priority_val) if priority_val and priority_val not in (Select.BLANK, "none") else ""
             profile = str(profile_val) if profile_val and profile_val is not Select.BLANK else self._default_profile
             self.dismiss(NewSessionResult(
                 name=name,

@@ -56,6 +56,33 @@ def textproxy_running() -> bool:
         return False
 
 
+# --- profile validation ------------------------------------------------------
+
+def validate_explicit_profile(name: str) -> None:
+    """Raise click.UsageError if *name* can't be activated.
+
+    Called only when ``--profile`` is explicitly passed on the CLI — silent
+    fallback is not acceptable when the user asked for a specific profile.
+    """
+    import click
+
+    if not _HAS_TEXTACCOUNTS:
+        raise click.UsageError(
+            f"Profile '{name}' requested but textaccounts is not installed.\n"
+            "Install it (uv tool install textaccounts) or remove --profile."
+        )
+    if not textaccounts_available():
+        raise click.UsageError(
+            "textaccounts is installed but not configured. Run: textaccounts init"
+        )
+    known = list_textaccounts_profiles()
+    if name not in known:
+        available = ", ".join(known) if known else "(none)"
+        raise click.UsageError(
+            f"Profile '{name}' not found in textaccounts. Available: {available}"
+        )
+
+
 # --- launch helpers ----------------------------------------------------------
 
 def resume_cmd(session_id: str, session_name: str, profile: str, env: dict[str, str], claude_cmd_tpl: str = "claude") -> list[str]:

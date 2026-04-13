@@ -93,7 +93,7 @@ def _sessions_from_index(yaml_path: Path, repo_label: str, repo_path: Path) -> l
             last_active=entry.get("last_active", ""),
             slug=entry.get("slug", ""),
             tags=entry.get("tags", []),
-            priority=entry.get("priority", ""),
+            priority=str(entry.get("priority", "") or ""),
             repo_label=repo_label,
             repo_path=repo_path,
             pinned=bool(entry.get("pinned", False)),
@@ -173,6 +173,7 @@ def _write_cache(sessions: list[Session]) -> None:
             "profile": s.profile,
             "repo_label": s.repo_label,
             "repo_path": str(s.repo_path),
+            "last_active": s.last_active,
         }
         for s in sessions
     ]
@@ -190,7 +191,7 @@ def _load_cache() -> list[Session]:
             id=d["id"],
             name=d["name"],
             profile=d["profile"],
-            last_active="",
+            last_active=d.get("last_active", ""),
             slug="",
             repo_label=d["repo_label"],
             repo_path=Path(d["repo_path"]),

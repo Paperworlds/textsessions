@@ -106,6 +106,29 @@ class TestLoadSessionsFast:
         names = {s.name for s in sessions2}
         assert names == {"alpha", "beta"}
 
+    def test_cache_includes_last_active(self, fake_state_dir, tmp_path):
+        """Cache entries must include last_active from the YAML index."""
+        from textsessions.sessions import load_sessions_fast
+
+        repo = tmp_path / "repo_c"
+        repo.mkdir()
+        (repo / ".git").mkdir()
+
+        from textsessions.config import repo_key as _repo_key
+        key = _repo_key(repo)
+        _write_yaml(fake_state_dir, key, {
+            "ccc333": {"name": "gamma", "profile": "work", "last_active": "2026-04-13 19:13", "slug": "gamma"},
+        })
+
+        cfg = _make_config(fake_state_dir, [{"path": str(repo), "label": "repo-c", "profile": "work"}])
+        sessions = load_sessions_fast(cfg)
+        assert len(sessions) == 1
+        assert sessions[0].last_active == "2026-04-13 19:13"
+
+        # Verify it round-trips through the cache
+        sessions2 = load_sessions_fast(cfg)
+        assert sessions2[0].last_active == "2026-04-13 19:13"
+
     def test_cache_invalidated_by_yaml_touch(self, fake_state_dir, tmp_path):
         """After touching a YAML, _cache_is_fresh() returns False."""
         from textsessions.sessions import _cache_is_fresh, _write_cache

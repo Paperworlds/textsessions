@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.6.1
+
+- `last_active` timestamp now included in session cache (`_cache.json`) — enables `tw status` active-today counts without scanning YAML files
+- `--model/-m` option on `textsessions new` — passes through to `claude --model`
+- Fix: priority modal crash (`Illegal select value False`) when YAML index had `priority: false`
+
+## v0.6.0
+
+- `textsessions new --repo REPO [--profile] [--name] [--model] [--priority]` — launch a new Claude session from the CLI
+- Profile validation: `--profile` now errors if textaccounts is missing or the profile doesn't exist (no more silent fallback)
+- Shell completions for `--repo` (repo labels) and `--profile` (textaccounts profiles) on the `new` command
+- Fish aliases: `ts`/`xts` shorthand for `textsessions` (installed via `just install-completions`)
+
 ## v0.5.4
 
 - `textsessions doctor` — validates integrations, tool availability, profile wiring, and session indexes in one command

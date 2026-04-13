@@ -40,6 +40,118 @@ def view(config_mode: bool) -> None:
     TextSessionsApp(config).run()
 
 
+def _complete_repo_labels(ctx: click.Context, param: click.Parameter, incomplete: str) -> list[click.shell_completion.CompletionItem]:
+    try:
+        config = load()
+        return [
+            click.shell_completion.CompletionItem(r.label, help=str(r.path))
+            for r in config.repos
+            if incomplete.lower() in r.label.lower()
+        ]
+    except Exception:
+        return []
+
+
+def _complete_profiles(ctx: click.Context, param: click.Parameter, incomplete: str) -> list[click.shell_completion.CompletionItem]:
+    try:
+        from .profiles import _HAS_TEXTACCOUNTS, list_textaccounts_profiles
+        if _HAS_TEXTACCOUNTS:
+            return [
+                click.shell_completion.CompletionItem(p)
+                for p in list_textaccounts_profiles()
+                if incomplete.lower() in p.lower()
+            ]
+    except Exception:
+        pass
+    return []
+
+
+@main.command("new")
+@click.option("--repo", "-r", "repo_label", required=True,
+              shell_complete=_complete_repo_labels,
+              help="Repo label from config (required).")
+@click.option("--profile", "-p", default="", shell_complete=_complete_profiles,
+              help="Claude profile (default: repo's configured profile).")
+@click.option("--name", "-n", default="", help="Session name passed to claude --name.")
+@click.option("--priority", type=click.Choice(["H0", "1", "2", "3"]), default=None,
+              help="Priority to assign after launch.")
+@click.option("--model", "-m", default="", help="Model to pass to claude --model.")
+def new_cmd(repo_label: str, profile: str, name: str, priority: str | None, model: str) -> None:
+    """Launch a new Claude Code session in a configured repo."""
+    import shlex
+    import subprocess
+    from datetime import datetime
+
+    from .config import detect_claude_dirs, repo_key as _repo_key
+    from .indexer import (
+        do_priority,
+        find_session_created_after,
+        load_index,
+        reindex_repos,
+        save_index,
+    )
+    from .profiles import build_launch_env, validate_explicit_profile
+
+    config = load()
+    if not config.repos:
+        click.echo("No repos configured. Run: textsessions init", err=True)
+        sys.exit(1)
+
+    # Resolve repo
+    matched_repos = [r for r in config.repos
+                     if r.label == repo_label
+                     or r.label.startswith(repo_label + "/")]
+    if not matched_repos:
+        labels = ", ".join(r.label for r in config.repos)
+        click.echo(f"No repo matching '{repo_label}'. Available: {labels}", err=True)
+        sys.exit(1)
+    repo = matched_repos[0]
+
+    # Profile: explicit → validate; empty → repo default
+    explicit_profile = bool(profile)
+    if not profile:
+        profile = repo.profile
+    if explicit_profile:
+        validate_explicit_profile(profile)
+
+    # Snapshot for post-launch metadata
+    rk = _repo_key(repo.path)
+    known_ids: set[str] = set(load_index(rk).keys())
+    launch_time = datetime.utcnow()
+
+    # Build env and command
+    env = build_launch_env(profile, {
+        "textaccounts": config.integrations.textaccounts,
+        "textproxy": config.integrations.textproxy,
+    })
+    if "CLAUDE_CONFIG_DIR" in env:
+        base_cmd = "claude"
+    else:
+        base_cmd = config.ui.claude_cmd.format(profile=profile or "default")
+    fish_parts = [base_cmd]
+    if name:
+        fish_parts += ["--name", shlex.quote(name)]
+    if model:
+        fish_parts += ["--model", shlex.quote(model)]
+    cmd = ["fish", "-c", " ".join(fish_parts)]
+
+    # Launch
+    result = subprocess.run(cmd, env=env, cwd=repo.path)
+
+    # Post-launch: reindex and apply priority
+    claude_dirs = detect_claude_dirs()
+    reindex_repos([repo], claude_dirs)
+    if priority:
+        sid = find_session_created_after(rk, launch_time, known_ids)
+        if sid:
+            index = load_index(rk)
+            if sid in index:
+                index = do_priority(index, sid, priority)
+                save_index(rk, index)
+
+    sys.exit(result.returncode)
+
+
 @main.command()
 @click.option("--yes", "-y", is_flag=True, help="Non-interactive mode (auto-detect, no prompts)")
 @click.option("--recursive", "recursive_dir", default="", metavar="PATH",

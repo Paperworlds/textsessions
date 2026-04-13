@@ -23,10 +23,18 @@ complete -c textsessions -f -n "__fish_use_subcommand" -a "rename"         -d "R
 complete -c textsessions -f -n "__fish_use_subcommand" -a "tag"            -d "Add or remove tags on a session"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "proxy"          -d "Show proxy stats"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "doctor"         -d "Check integrations and config for problems"
+complete -c textsessions -f -n "__fish_use_subcommand" -a "new"            -d "Launch a new session"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "config"         -d "Show config"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "profile"        -d "Manage profiles"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "search"         -d "Search sessions using natural language (AI-powered)"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "tree"           -d "Dump repos and sessions as YAML/JSON tree"
+
+# new flags
+complete -c textsessions -n "__fish_seen_subcommand_from new" -s r -l repo     -d "Repo label" -rxa "data mono personal textlives textworld"
+complete -c textsessions -n "__fish_seen_subcommand_from new" -s p -l profile  -d "Claude profile" -xa "default work personal"
+complete -c textsessions -n "__fish_seen_subcommand_from new" -s n -l name     -d "Session name" -r
+complete -c textsessions -n "__fish_seen_subcommand_from new" -l priority      -d "Priority level" -xa "H0 1 2 3"
+complete -c textsessions -n "__fish_seen_subcommand_from new" -s m -l model    -d "Claude model" -xa "opus sonnet haiku claude-sonnet-4-6 claude-opus-4-6 claude-haiku-4-5-20251001"
 
 # reindex flags
 complete -c textsessions -n "__fish_seen_subcommand_from reindex" -l repo -d "Limit to repo" -xa "(textsessions sessions --json 2>/dev/null | python3 -c \"import sys,json; [print(s.get('repo','')) for s in json.load(sys.stdin) if s.get('repo')]\" 2>/dev/null | sort -u)"
