@@ -422,17 +422,20 @@ def delete_session(index: dict, sid: str) -> dict:
     return index
 
 
-def reindex_repos(repos: list, claude_dirs: list[Path]) -> int:
+def reindex_repos(repos: list, claude_dirs: list[Path], *, all_repos: list | None = None) -> int:
     """Rebuild indexes for the given repos. Returns total session count.
 
     Sessions created from subdirectories of a configured repo (e.g.
     features/branch-name) are included under the parent repo's index,
     unless that subdirectory matches another configured repo.
+
+    all_repos: full list of configured repos for closest-match exclusion.
+               Defaults to *repos* when not provided.
     """
     # Build sorted list of all configured repo keys (longest first) so we
     # can assign each project dir to the closest (most specific) repo.
     all_repo_keys = sorted(
-        (str(r.path).replace("/", "-") for r in repos),
+        (str(r.path).replace("/", "-") for r in (all_repos or repos)),
         key=len, reverse=True,
     )
 

@@ -356,15 +356,8 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
         repo = best.label
         # Auto-reindex the matched repo so the list is always current
         from .config import detect_claude_dirs
-        from .indexer import build_index
-        rk = repo_key(best.path)
-        pairs = [
-            f"{cd}::{cd / 'projects' / rk}"
-            for cd in detect_claude_dirs()
-            if (cd / "projects" / rk).exists()
-        ]
-        if pairs:
-            build_index(rk, pairs)
+        from .indexer import reindex_repos
+        reindex_repos([best], detect_claude_dirs(), all_repos=config.repos)
     elif reindex:
         from .config import detect_claude_dirs
         from .indexer import reindex_repos
