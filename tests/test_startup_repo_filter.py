@@ -23,9 +23,10 @@ def test_repo_for_cwd_match(tmp_path, monkeypatch):
     cwd.mkdir(parents=True)
     monkeypatch.chdir(cwd)
     config = _make_config((str(repo_path), "myrepo"))
-    result = _repo_for_cwd(config)
+    result, is_parent = _repo_for_cwd(config)
     assert result is not None
     assert result.label == "myrepo"
+    assert is_parent is False
 
 
 def test_repo_for_cwd_no_match(tmp_path, monkeypatch):
@@ -36,8 +37,9 @@ def test_repo_for_cwd_no_match(tmp_path, monkeypatch):
     unrelated.mkdir()
     monkeypatch.chdir(unrelated)
     config = _make_config((str(repo_path), "myrepo"))
-    result = _repo_for_cwd(config)
+    result, is_parent = _repo_for_cwd(config)
     assert result is None
+    assert is_parent is False
 
 
 def test_repo_for_cwd_closest(tmp_path, monkeypatch):
@@ -51,6 +53,21 @@ def test_repo_for_cwd_closest(tmp_path, monkeypatch):
         (str(parent), "parent-label"),
         (str(child), "child-label"),
     )
-    result = _repo_for_cwd(config)
+    result, is_parent = _repo_for_cwd(config)
     assert result is not None
     assert result.label == "child-label"
+
+
+def test_repo_for_cwd_parent_match_warns(tmp_path, monkeypatch):
+    """cwd in an unconfigured git repo under a parent repo → is_parent_match=True."""
+    parent = tmp_path / "projects"
+    parent.mkdir()
+    child = parent / "subrepo"
+    child.mkdir()
+    (child / ".git").mkdir()  # it's a git repo but not configured
+    monkeypatch.chdir(child)
+    config = _make_config((str(parent), "parent-label"))
+    result, is_parent = _repo_for_cwd(config)
+    assert result is not None
+    assert result.label == "parent-label"
+    assert is_parent is True

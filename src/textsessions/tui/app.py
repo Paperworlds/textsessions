@@ -37,8 +37,12 @@ from .modals import NewSessionResult
 PRIORITY_COLORS = {"H0": "bold red", "1": "yellow", "2": "cyan", "3": "dim", "": ""}
 
 
-def _repo_for_cwd(config: Config) -> RepoConfig | None:
-    """Return the closest configured repo that is a parent of (or equal to) cwd."""
+def _repo_for_cwd(config: Config) -> tuple[RepoConfig | None, bool]:
+    """Return the closest configured repo that is a parent of (or equal to) cwd.
+
+    Returns (repo, is_parent_match) — is_parent_match is True when cwd is inside
+    an unconfigured git repo that falls under a broader parent repo.
+    """
     cwd = Path.cwd()
     best: RepoConfig | None = None
     best_len = -1
@@ -51,7 +55,11 @@ def _repo_for_cwd(config: Config) -> RepoConfig | None:
         if parts > best_len:
             best_len = parts
             best = repo
-    return best
+    if best is None:
+        return None, False
+    # Check if cwd is in an unconfigured git repo under the matched parent
+    is_parent_match = best.path != cwd and (cwd / ".git").exists()
+    return best, is_parent_match
 
 
 class SessionDetail(Static):
@@ -219,10 +227,18 @@ class TextSessionsApp(ActionsMixin, App):
 
     def on_mount(self) -> None:
         self._sessions = load_sessions(self._config)
-        matched = _repo_for_cwd(self._config)
+        matched, is_parent = _repo_for_cwd(self._config)
         if matched and self._config.ui.startup_repo == "current":
             self._cwd_repo_label = matched.label
             self._repo_filter = matched.label
+        if is_parent:
+            cwd_name = Path.cwd().name
+            self.notify(
+                f"'{cwd_name}' not configured — showing parent '{matched.label}'. "
+                f"Run: textsessions add .",
+                severity="warning",
+                timeout=8,
+            )
         self._refresh_view()
         self.set_interval(5, self._refresh_proxy)
         self._refresh_proxy()

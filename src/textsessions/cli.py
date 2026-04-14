@@ -328,8 +328,10 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
                 best = r
         if best is None:
             click.echo(f"No configured repo matches current directory ({cwd}).", err=True)
-            click.echo("Run: textsessions init", err=True)
+            click.echo("Run: textsessions add .", err=True)
             sys.exit(1)
+        if best.path != cwd and (cwd / ".git").exists():
+            click.echo(f"Note: '{cwd.name}' is not configured — matched parent '{best.label}'. Run: textsessions add .", err=True)
         repo = best.label
         # Auto-reindex the matched repo so the list is always current
         from .config import detect_claude_dirs
