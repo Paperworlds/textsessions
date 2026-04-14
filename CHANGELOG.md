@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.6.3
+
+- Profile prefix in textproxy base URL (`/p/<profile>`) — enables per-profile tagging in textproxy
+
 ## v0.6.2
 
 - `--repo` is now optional in `textsessions new` — detects repo from current directory when omitted
