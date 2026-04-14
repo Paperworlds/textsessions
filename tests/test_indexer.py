@@ -256,6 +256,64 @@ def test_reindex_repos_includes_subdirectories(tmp_path):
     assert total == 2
 
 
+@pytest.mark.skipif(
+    not importable("tomli_w"),
+    reason="tomli_w not installed (needed by config → sessions chain)",
+)
+def test_reindex_repos_excludes_child_repo_sessions(tmp_path):
+    """Subdir matching must not claim sessions belonging to another configured repo."""
+    from textsessions.indexer import reindex_repos
+
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+
+    parent_path = tmp_path / "projects" / "personal"
+    parent_path.mkdir(parents=True)
+    child_path = parent_path / "paperworlds" / "paperagents"
+    child_path.mkdir(parents=True)
+
+    parent_rk = str(parent_path).replace("/", "-")
+    child_rk = str(child_path).replace("/", "-")
+
+    # Parent repo session
+    parent_dir = claude_dir / "projects" / parent_rk
+    parent_dir.mkdir(parents=True)
+    (parent_dir / ("a" * 36 + ".jsonl")).write_text(
+        json.dumps({"type": "user", "timestamp": "2026-01-01T10:00:00Z",
+                    "message": {"content": "Parent session"}}) + "\n"
+    )
+
+    # Child repo session (key starts with parent key, but is a separate repo)
+    child_dir = claude_dir / "projects" / child_rk
+    child_dir.mkdir(parents=True)
+    (child_dir / ("b" * 36 + ".jsonl")).write_text(
+        json.dumps({"type": "user", "timestamp": "2026-01-02T10:00:00Z",
+                    "message": {"content": "Child session"}}) + "\n"
+    )
+
+    class FakeRepo:
+        def __init__(self, path, label, profile):
+            self.path = path
+            self.label = label
+            self.profile = profile
+
+    parent_repo = FakeRepo(path=parent_path, label="personal", profile="personal")
+    child_repo = FakeRepo(path=child_path, label="paperagents", profile="personal")
+
+    state_dir = tmp_path / "state"
+    with patch("textsessions.indexer.STATE_DIR", state_dir), \
+         patch("textsessions.indexer.LEGACY_INDEX_DIR", tmp_path / "legacy"):
+        reindex_repos([parent_repo, child_repo], [claude_dir])
+        parent_index = load_index(parent_rk)
+        child_index = load_index(child_rk)
+
+    # Each repo gets exactly its own session — parent must NOT absorb child's
+    assert len(parent_index) == 1
+    assert "a" * 36 in parent_index
+    assert len(child_index) == 1
+    assert "b" * 36 in child_index
+
+
 # ---------------------------------------------------------------------------
 # build_index
 # ---------------------------------------------------------------------------

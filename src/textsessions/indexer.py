@@ -154,6 +154,7 @@ def scan_sessions(pairs: list[str]) -> list[dict]:
     pairs: list of "<claude_dir>::<sessions_dir>" strings.
     Returns list of dicts sorted by last_ts descending.
     """
+    seen_ids: set[str] = set()
     sessions = []
     claude_dirs = {pair.split("::")[0] for pair in pairs}
     launch_names = _load_session_names(claude_dirs)
@@ -195,6 +196,9 @@ def scan_sessions(pairs: list[str]) -> list[dict]:
             if user_msgs and last_ts:
                 combined = " | ".join(user_msgs[:3])
                 full_sid = os.path.basename(path).replace(".jsonl", "")
+                if full_sid in seen_ids:
+                    continue
+                seen_ids.add(full_sid)
                 # custom-title from .jsonl takes precedence; fall back to
                 # --name from launch metadata (PID json)
                 if not custom_title:
@@ -422,8 +426,13 @@ def reindex_repos(repos: list, claude_dirs: list[Path]) -> int:
     """Rebuild indexes for the given repos. Returns total session count.
 
     Sessions created from subdirectories of a configured repo (e.g.
-    features/branch-name) are included under the parent repo's index.
+    features/branch-name) are included under the parent repo's index,
+    unless that subdirectory matches another configured repo.
     """
+    # Build set of all configured repo keys so we can exclude them from
+    # subdirectory matching (they get their own index).
+    all_repo_keys = {str(r.path).replace("/", "-") for r in repos}
+
     total = 0
     for r in repos:
         rk = str(r.path).replace("/", "-")
@@ -435,9 +444,13 @@ def reindex_repos(repos: list, claude_dirs: list[Path]) -> int:
             for child in projects_dir.iterdir():
                 if not child.is_dir():
                     continue
-                # Exact match or subdirectory match (key starts with repo key + "-")
-                if child.name == rk or child.name.startswith(rk + "-"):
+                if child.name == rk:
                     pairs.append(f"{cd}::{child}")
+                elif child.name.startswith(rk + "-"):
+                    # Subdirectory of this repo — include unless it (or a
+                    # parent path) is itself a configured repo.
+                    if child.name not in all_repo_keys:
+                        pairs.append(f"{cd}::{child}")
         if not pairs:
             continue
         index = build_index(rk, pairs)
