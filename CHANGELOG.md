@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.7.1
+
+- `f` key in TUI opens a repo filter dropdown — pick any configured repo label to filter the session table, or "All repos" to clear
+- `--current-folder` auto-reindex now uses `reindex_repos` with `all_repos` param — no logic duplication, subdirectory sessions included correctly
+
 ## v0.7.0
 
 - Sessions from repo subdirectories (e.g. `features/branch`) now appear under the parent repo's index
