@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.6.2
+
+- `--repo` is now optional in `textsessions new` — detects repo from current directory when omitted
+- `ts`, `xts` aliases registered as Python entry points in pyproject (no more fish wrapper functions)
+
 ## v0.6.1
 
 - `last_active` timestamp now included in session cache (`_cache.json`) — enables `tw status` active-today counts without scanning YAML files
