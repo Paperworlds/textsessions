@@ -67,9 +67,9 @@ def _complete_profiles(ctx: click.Context, param: click.Parameter, incomplete: s
 
 
 @main.command("new")
-@click.option("--repo", "-r", "repo_label", required=True,
+@click.option("--repo", "-r", "repo_label", default="",
               shell_complete=_complete_repo_labels,
-              help="Repo label from config (required).")
+              help="Repo label (default: detect from current directory).")
 @click.option("--profile", "-p", default="", shell_complete=_complete_profiles,
               help="Claude profile (default: repo's configured profile).")
 @click.option("--name", "-n", default="", help="Session name passed to claude --name.")
@@ -97,15 +97,36 @@ def new_cmd(repo_label: str, profile: str, name: str, priority: str | None, mode
         click.echo("No repos configured. Run: textsessions init", err=True)
         sys.exit(1)
 
-    # Resolve repo
-    matched_repos = [r for r in config.repos
-                     if r.label == repo_label
-                     or r.label.startswith(repo_label + "/")]
-    if not matched_repos:
-        labels = ", ".join(r.label for r in config.repos)
-        click.echo(f"No repo matching '{repo_label}'. Available: {labels}", err=True)
-        sys.exit(1)
-    repo = matched_repos[0]
+    # Resolve repo: explicit label or detect from cwd
+    if repo_label:
+        matched_repos = [r for r in config.repos
+                         if r.label == repo_label
+                         or r.label.startswith(repo_label + "/")]
+        if not matched_repos:
+            labels = ", ".join(r.label for r in config.repos)
+            click.echo(f"No repo matching '{repo_label}'. Available: {labels}", err=True)
+            sys.exit(1)
+        repo = matched_repos[0]
+    else:
+        cwd = Path.cwd()
+        best: RepoConfig | None = None
+        best_len = -1
+        for r in config.repos:
+            try:
+                cwd.relative_to(r.path)
+            except ValueError:
+                continue
+            parts = len(r.path.parts)
+            if parts > best_len:
+                best_len = parts
+                best = r
+        if best is None:
+            click.echo(f"No configured repo matches current directory ({cwd}).", err=True)
+            click.echo("Add it with: textsessions add .", err=True)
+            sys.exit(1)
+        if best.path != cwd and (cwd / ".git").exists():
+            click.echo(f"Note: '{cwd.name}' is not configured — matched parent '{best.label}'. Run: textsessions add .", err=True)
+        repo = best
 
     # Profile: explicit → validate; empty → repo default
     explicit_profile = bool(profile)

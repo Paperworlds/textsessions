@@ -28,6 +28,8 @@ Issues = "https://github.com/paperworlds/textsessions/issues"
 
 [project.scripts]
 textsessions = "textsessions.cli:main"
+ts = "textsessions.cli:main"
+xts = "textsessions.cli:main"
 claude-sessions-index = "textsessions.cli:sessions_index_compat"
 
 [tool.hatch.metadata]
