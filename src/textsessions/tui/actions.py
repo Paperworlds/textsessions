@@ -30,6 +30,7 @@ from .modals import (
     NewSessionResult,
     PriorityModal,
     RenameModal,
+    RepoFilterModal,
     TagModal,
     _DeleteConfirmModal,
 )
@@ -234,6 +235,17 @@ class ActionsMixin:
             self.notify(verb, severity="information")
         except Exception as e:
             self.notify(f"Pin failed: {e}", severity="error")
+
+    def action_repo_filter(self) -> None:
+        labels = [r.label for r in self._config.repos]
+
+        def handle(result: str | None) -> None:
+            if result is None:
+                return
+            self._repo_filter = result
+            self._refresh_view()
+
+        self.push_screen(RepoFilterModal(labels, self._repo_filter), handle)
 
     def action_show_help(self) -> None:
         self.push_screen(HelpModal())

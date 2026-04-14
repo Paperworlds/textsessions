@@ -223,6 +223,7 @@ class HelpModal(ModalScreen[None]):
         ("d",             "Archive session"),
         ("D",             "Delete session"),
         ("a",             "Toggle all repos / current folder"),
+        ("f",             "Filter by repo (dropdown)"),
         ("s",             "Toggle sort (date / priority)"),
         ("g",             "Toggle ghosts"),
         ("ctrl+r",        "Reindex current scope"),
@@ -239,6 +240,37 @@ class HelpModal(ModalScreen[None]):
                 yield Static(f"  [bold cyan]{key:<14}[/bold cyan] {desc}")
             yield Static("")
             yield Static("[dim]press ?, escape, or q to close[/dim]")
+
+
+class RepoFilterModal(ModalScreen[str | None]):
+    """Modal to pick a repo filter from all configured repos."""
+
+    BINDINGS = [
+        Binding("escape", "dismiss(None)", "Cancel"),
+    ]
+
+    def __init__(self, repo_labels: list[str], current: str) -> None:
+        super().__init__()
+        self._repo_labels = repo_labels
+        self._current = current
+
+    def compose(self) -> ComposeResult:
+        options: list[tuple[str, str]] = [("All repos", "")]
+        options += [(label, label) for label in self._repo_labels]
+        initial = self._current if self._current in self._repo_labels else ""
+        with Vertical(id="dialog"):
+            yield Label("[bold]Filter by repo[/bold]", id="title")
+            yield Select(options, id="repo-select", allow_blank=False, value=initial)
+            with Horizontal(id="buttons"):
+                yield Button("Select", variant="primary", id="select")
+                yield Button("Cancel", id="cancel")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "select":
+            val = self.query_one("#repo-select", Select).value
+            self.dismiss("" if val is Select.BLANK else str(val))
+        else:
+            self.dismiss(None)
 
 
 class NewSessionModal(ModalScreen[NewSessionResult | None]):

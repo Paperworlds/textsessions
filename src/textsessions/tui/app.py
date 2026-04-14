@@ -188,6 +188,7 @@ class TextSessionsApp(ActionsMixin, App):
         Binding("x", "pin_session", "Pin", show=False),
         Binding("y", "toggle_pins", "Pins", show=False),
         Binding("a", "toggle_all", "All", show=False),
+        Binding("f", "repo_filter", "Repo", show=False),
         Binding("s", "toggle_sort", "Sort", show=False),
         Binding("g", "toggle_ghosts", "Ghosts", show=False),
         Binding("ctrl+r", "reindex", "Reindex", show=False),
