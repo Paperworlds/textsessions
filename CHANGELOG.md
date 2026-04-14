@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.0
+
+- Sessions from repo subdirectories (e.g. `features/branch`) now appear under the parent repo's index
+- `--name` from `claude --name` at launch is picked up as session name (reads `~/.claude*/sessions/*.json` metadata)
+- Closest-repo matching: subdirectory sessions are assigned to the most specific configured ancestor, preventing duplicates across nested repos
+- Session deduplication safety net in scanner
+
 ## v0.6.3
 
 - Profile prefix in textproxy base URL (`/p/<profile>`) — enables per-profile tagging in textproxy
