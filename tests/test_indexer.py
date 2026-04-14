@@ -9,6 +9,14 @@ from unittest.mock import patch
 import pytest
 import yaml
 
+def importable(name: str) -> bool:
+    try:
+        __import__(name)
+        return True
+    except ImportError:
+        return False
+
+
 from textsessions.indexer import (
     build_index,
     delete_session,
@@ -137,6 +145,115 @@ def test_scan_sessions_skips_slash_messages(tmp_path):
     (sessions_dir / ("x" * 32 + ".jsonl")).write_text("\n".join(lines))
     results = scan_sessions([f"{tmp_path / '.claude'}::{sessions_dir}"])
     assert results == []
+
+
+def test_scan_sessions_launch_name_fallback(tmp_path):
+    """--name from launch metadata is used when no custom-title in .jsonl."""
+    claude_dir = tmp_path / ".claude-work"
+    claude_dir.mkdir()
+    sessions_dir = tmp_path / "sessions"
+    sessions_dir.mkdir()
+
+    sid = "c895c641-ab6b-46bf-9d43-447a7ef8dd8e"
+    lines = [
+        json.dumps({"type": "user", "timestamp": "2026-04-11T21:00:00Z",
+                    "message": {"content": "Help me build a daemon"}}),
+    ]
+    (sessions_dir / f"{sid}.jsonl").write_text("\n".join(lines))
+
+    # Write PID metadata with session name
+    meta_dir = claude_dir / "sessions"
+    meta_dir.mkdir()
+    (meta_dir / "12345.json").write_text(json.dumps({
+        "pid": 12345,
+        "sessionId": sid,
+        "name": "daemon",
+    }))
+
+    results = scan_sessions([f"{claude_dir}::{sessions_dir}"])
+    assert len(results) == 1
+    assert results[0]["custom_title"] == "daemon"
+
+
+def test_scan_sessions_custom_title_overrides_launch_name(tmp_path):
+    """custom-title in .jsonl takes precedence over --name from metadata."""
+    claude_dir = tmp_path / ".claude-work"
+    claude_dir.mkdir()
+    sessions_dir = tmp_path / "sessions"
+    sessions_dir.mkdir()
+
+    sid = "abcd1234-0000-0000-0000-000000000000"
+    lines = [
+        json.dumps({"type": "custom-title", "customTitle": "renamed-title",
+                    "timestamp": "2026-04-11T21:00:00Z"}),
+        json.dumps({"type": "user", "timestamp": "2026-04-11T21:00:01Z",
+                    "message": {"content": "Hello"}}),
+    ]
+    (sessions_dir / f"{sid}.jsonl").write_text("\n".join(lines))
+
+    meta_dir = claude_dir / "sessions"
+    meta_dir.mkdir()
+    (meta_dir / "99999.json").write_text(json.dumps({
+        "pid": 99999,
+        "sessionId": sid,
+        "name": "original-launch-name",
+    }))
+
+    results = scan_sessions([f"{claude_dir}::{sessions_dir}"])
+    assert len(results) == 1
+    assert results[0]["custom_title"] == "renamed-title"
+
+
+@pytest.mark.skipif(
+    not importable("tomli_w"),
+    reason="tomli_w not installed (needed by config → sessions chain)",
+)
+def test_reindex_repos_includes_subdirectories(tmp_path):
+    """Sessions from repo subdirs (e.g. features/branch) are included."""
+    from textsessions.indexer import reindex_repos
+
+    claude_dir = tmp_path / ".claude-personal"
+    claude_dir.mkdir()
+
+    repo_path = tmp_path / "myrepo"
+    repo_path.mkdir()
+
+    # Main repo sessions dir
+    rk = str(repo_path).replace("/", "-")
+    main_dir = claude_dir / "projects" / rk
+    main_dir.mkdir(parents=True)
+    sid1 = "a" * 36
+    (main_dir / f"{sid1}.jsonl").write_text(
+        json.dumps({"type": "user", "timestamp": "2026-01-01T10:00:00Z",
+                    "message": {"content": "Main repo session"}}) + "\n"
+    )
+
+    # Subdirectory sessions dir (features/branch)
+    sub_key = rk + "-features-my-branch"
+    sub_dir = claude_dir / "projects" / sub_key
+    sub_dir.mkdir(parents=True)
+    sid2 = "b" * 36
+    (sub_dir / f"{sid2}.jsonl").write_text(
+        json.dumps({"type": "user", "timestamp": "2026-01-02T10:00:00Z",
+                    "message": {"content": "Feature branch session"}}) + "\n"
+    )
+
+    state_dir = tmp_path / "state"
+
+    # Use a simple namespace to avoid importing RepoConfig (which pulls tomli_w)
+    class FakeRepo:
+        def __init__(self, path, label, profile):
+            self.path = path
+            self.label = label
+            self.profile = profile
+
+    repo = FakeRepo(path=repo_path, label="myrepo", profile="personal")
+
+    with patch("textsessions.indexer.STATE_DIR", state_dir), \
+         patch("textsessions.indexer.LEGACY_INDEX_DIR", tmp_path / "legacy"):
+        total = reindex_repos([repo], [claude_dir])
+
+    assert total == 2
 
 
 # ---------------------------------------------------------------------------

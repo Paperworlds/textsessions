@@ -123,6 +123,31 @@ def _update_legacy_priority(repo_key: str, sid: str, level: str) -> None:
 # Scanning
 # ---------------------------------------------------------------------------
 
+def _load_session_names(claude_dirs: set[str]) -> dict[str, str]:
+    """Load session names from ~/.claude*/sessions/*.json (PID metadata).
+
+    These are set by ``claude --name`` at launch time and are *not* written
+    into the .jsonl.  Returns {sessionId: name}.
+    """
+    names: dict[str, str] = {}
+    for cd in claude_dirs:
+        meta_dir = Path(cd) / "sessions"
+        if not meta_dir.is_dir():
+            continue
+        for f in meta_dir.iterdir():
+            if f.suffix != ".json":
+                continue
+            try:
+                d = json.loads(f.read_text())
+                sid = d.get("sessionId", "")
+                name = d.get("name", "")
+                if sid and name:
+                    names[sid] = name
+            except (json.JSONDecodeError, OSError):
+                continue
+    return names
+
+
 def scan_sessions(pairs: list[str]) -> list[dict]:
     """Scan .jsonl files and return raw session data.
 
@@ -130,6 +155,8 @@ def scan_sessions(pairs: list[str]) -> list[dict]:
     Returns list of dicts sorted by last_ts descending.
     """
     sessions = []
+    claude_dirs = {pair.split("::")[0] for pair in pairs}
+    launch_names = _load_session_names(claude_dirs)
     for pair in pairs:
         claude_dir, sessions_dir = pair.split("::")
         profile = os.path.basename(claude_dir)
@@ -168,6 +195,10 @@ def scan_sessions(pairs: list[str]) -> list[dict]:
             if user_msgs and last_ts:
                 combined = " | ".join(user_msgs[:3])
                 full_sid = os.path.basename(path).replace(".jsonl", "")
+                # custom-title from .jsonl takes precedence; fall back to
+                # --name from launch metadata (PID json)
+                if not custom_title:
+                    custom_title = launch_names.get(full_sid, "")
                 sessions.append({
                     "id": full_sid,
                     "last_ts": last_ts,
@@ -388,16 +419,25 @@ def delete_session(index: dict, sid: str) -> dict:
 
 
 def reindex_repos(repos: list, claude_dirs: list[Path]) -> int:
-    """Rebuild indexes for the given repos. Returns total session count."""
-    from .config import repo_key
+    """Rebuild indexes for the given repos. Returns total session count.
+
+    Sessions created from subdirectories of a configured repo (e.g.
+    features/branch-name) are included under the parent repo's index.
+    """
     total = 0
     for r in repos:
-        rk = repo_key(r.path)
-        pairs = [
-            f"{cd}::{cd / 'projects' / rk}"
-            for cd in claude_dirs
-            if (cd / "projects" / rk).exists()
-        ]
+        rk = str(r.path).replace("/", "-")
+        pairs: list[str] = []
+        for cd in claude_dirs:
+            projects_dir = cd / "projects"
+            if not projects_dir.exists():
+                continue
+            for child in projects_dir.iterdir():
+                if not child.is_dir():
+                    continue
+                # Exact match or subdirectory match (key starts with repo key + "-")
+                if child.name == rk or child.name.startswith(rk + "-"):
+                    pairs.append(f"{cd}::{child}")
         if not pairs:
             continue
         index = build_index(rk, pairs)
