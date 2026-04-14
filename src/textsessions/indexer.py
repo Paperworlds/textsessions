@@ -429,9 +429,19 @@ def reindex_repos(repos: list, claude_dirs: list[Path]) -> int:
     features/branch-name) are included under the parent repo's index,
     unless that subdirectory matches another configured repo.
     """
-    # Build set of all configured repo keys so we can exclude them from
-    # subdirectory matching (they get their own index).
-    all_repo_keys = {str(r.path).replace("/", "-") for r in repos}
+    # Build sorted list of all configured repo keys (longest first) so we
+    # can assign each project dir to the closest (most specific) repo.
+    all_repo_keys = sorted(
+        (str(r.path).replace("/", "-") for r in repos),
+        key=len, reverse=True,
+    )
+
+    def _best_repo_key(child_name: str) -> str | None:
+        """Return the most specific configured repo key that matches child_name."""
+        for key in all_repo_keys:
+            if child_name == key or child_name.startswith(key + "-"):
+                return key
+        return None
 
     total = 0
     for r in repos:
@@ -447,9 +457,9 @@ def reindex_repos(repos: list, claude_dirs: list[Path]) -> int:
                 if child.name == rk:
                     pairs.append(f"{cd}::{child}")
                 elif child.name.startswith(rk + "-"):
-                    # Subdirectory of this repo — include unless it (or a
-                    # parent path) is itself a configured repo.
-                    if child.name not in all_repo_keys:
+                    # Subdirectory — only include if this repo is the
+                    # closest (most specific) configured ancestor.
+                    if _best_repo_key(child.name) == rk:
                         pairs.append(f"{cd}::{child}")
         if not pairs:
             continue
