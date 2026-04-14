@@ -154,7 +154,7 @@ def test_build_launch_env_with_textproxy():
     ):
         env = build_launch_env("default", {"textaccounts": False, "textproxy": True})
 
-    assert env["ANTHROPIC_BASE_URL"] == "http://localhost:7474"
+    assert env["ANTHROPIC_BASE_URL"] == "http://localhost:7474/p/default"
 
 
 def test_build_launch_env_textproxy_not_running():

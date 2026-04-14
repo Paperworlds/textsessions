@@ -132,6 +132,6 @@ def build_launch_env(profile: str, integrations_enabled: dict[str, bool]) -> dic
 
     if integrations_enabled.get("textproxy", True):
         if textproxy_available() and textproxy_running():
-            env["ANTHROPIC_BASE_URL"] = "http://localhost:7474"
+            env["ANTHROPIC_BASE_URL"] = f"http://localhost:7474/p/{profile}"
 
     return env
