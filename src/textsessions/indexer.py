@@ -18,8 +18,6 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-_HEX_RE = re.compile(r"^[0-9a-f]{5,8}$")
-
 import yaml
 
 from .config import STATE_DIR
