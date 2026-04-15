@@ -22,7 +22,7 @@ _HEX_RE = re.compile(r"^[0-9a-f]{5,8}$")
 
 import yaml
 
-STATE_DIR = Path.home() / ".local" / "state" / "claude-sessions"
+from .config import STATE_DIR
 # Legacy paths for migration / backward compat
 LEGACY_PRIORITY_DIR = Path.home() / ".claude-work" / "session-priority"
 LEGACY_INDEX_DIR = Path.home() / ".claude-work" / "session-index"
