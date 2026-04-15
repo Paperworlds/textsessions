@@ -159,15 +159,29 @@ def test_build_launch_env_with_textproxy():
 
 
 def test_build_launch_env_textproxy_not_running():
-    """When textproxy is not running and no existing URL, ANTHROPIC_BASE_URL is not set."""
+    """When textproxy is not running, ANTHROPIC_BASE_URL is cleared from env."""
+    stale_env = {**CLEAN_ENV, "ANTHROPIC_BASE_URL": "http://localhost:7474"}
     with (
         patch("textsessions.profiles._HAS_TEXTACCOUNTS", False),
-        patch("textsessions.profiles.os.environ", CLEAN_ENV),
+        patch("textsessions.profiles.os.environ", stale_env),
         patch("textsessions.profiles.textproxy_running", return_value=False),
     ):
         env = build_launch_env("default", {"textaccounts": False, "textproxy": True})
 
     assert "ANTHROPIC_BASE_URL" not in env
+
+
+def test_build_launch_env_textproxy_disabled_preserves_url():
+    """When textproxy integration is disabled, ANTHROPIC_BASE_URL is left untouched."""
+    stale_env = {**CLEAN_ENV, "ANTHROPIC_BASE_URL": "http://localhost:7474"}
+    with (
+        patch("textsessions.profiles._HAS_TEXTACCOUNTS", False),
+        patch("textsessions.profiles.os.environ", stale_env),
+        patch("textsessions.profiles.textproxy_running", return_value=False),
+    ):
+        env = build_launch_env("default", {"textaccounts": False, "textproxy": False})
+
+    assert env["ANTHROPIC_BASE_URL"] == "http://localhost:7474"
 
 
 
