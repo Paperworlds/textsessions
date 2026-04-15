@@ -42,18 +42,28 @@ except ImportError:
 
 # --- textproxy integration ---------------------------------------------------
 
+TEXTPROXY_HOST = "localhost"
+TEXTPROXY_PORT = 7474
+TEXTPROXY_BASE_URL = f"http://{TEXTPROXY_HOST}:{TEXTPROXY_PORT}"
+
+
 def textproxy_available() -> bool:
     """True if textproxy binary is on PATH."""
     return shutil.which("textproxy") is not None
 
 
 def textproxy_running() -> bool:
-    """True if localhost:7474 is responding (quick socket check, <100ms timeout)."""
+    """True if textproxy is responding (quick socket check, <100ms timeout)."""
     try:
-        with socket.create_connection(("localhost", 7474), timeout=0.1):
+        with socket.create_connection((TEXTPROXY_HOST, TEXTPROXY_PORT), timeout=0.1):
             return True
     except (OSError, TimeoutError):
         return False
+
+
+def textproxy_url(profile: str) -> str:
+    """Return the ANTHROPIC_BASE_URL for the given profile."""
+    return f"{TEXTPROXY_BASE_URL}/p/{profile}"
 
 
 # --- profile validation ------------------------------------------------------
@@ -132,7 +142,7 @@ def build_launch_env(profile: str, integrations_enabled: dict[str, bool]) -> dic
 
     if integrations_enabled.get("textproxy", True):
         existing = env.get("ANTHROPIC_BASE_URL", "")
-        if existing.startswith("http://localhost:7474") or textproxy_running():
-            env["ANTHROPIC_BASE_URL"] = f"http://localhost:7474/p/{profile}"
+        if existing.startswith(TEXTPROXY_BASE_URL) or textproxy_running():
+            env["ANTHROPIC_BASE_URL"] = textproxy_url(profile)
 
     return env

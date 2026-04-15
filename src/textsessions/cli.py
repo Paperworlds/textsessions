@@ -1133,12 +1133,12 @@ def doctor_cmd() -> None:
 
     console.print()
     console.print("[bold]textproxy[/bold]")
-    from .profiles import textproxy_available, textproxy_running
+    from .profiles import TEXTPROXY_BASE_URL, textproxy_available, textproxy_running
     tp_enabled = config.integrations.textproxy
     check("textproxy on PATH", textproxy_available(),
           fix="Install textproxy: https://github.com/paperworlds/textproxy")
     if textproxy_available():
-        check("textproxy running on :7474", textproxy_running(),
+        check(f"textproxy running on {TEXTPROXY_BASE_URL}", textproxy_running(),
               fix="Start textproxy, or set textproxy = false under [integrations] to suppress")
     if not tp_enabled:
         console.print("  [dim]  (disabled in config)[/dim]")
