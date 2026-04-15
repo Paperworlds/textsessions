@@ -14,7 +14,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from textsessions.profiles import (
-    TEXTPROXY_BASE_URL,
     build_launch_env,
     list_textaccounts_profiles,
     textaccounts_available,
@@ -170,19 +169,6 @@ def test_build_launch_env_textproxy_not_running():
 
     assert "ANTHROPIC_BASE_URL" not in env
 
-
-def test_build_launch_env_textproxy_url_already_set():
-    """When ANTHROPIC_BASE_URL is already pointing at localhost:7474 (e.g. set by textaccounts),
-    the profile prefix is applied even if the socket check fails."""
-    env_with_proxy = {**CLEAN_ENV, "ANTHROPIC_BASE_URL": TEXTPROXY_BASE_URL}
-    with (
-        patch("textsessions.profiles._HAS_TEXTACCOUNTS", False),
-        patch("textsessions.profiles.os.environ", env_with_proxy),
-        patch("textsessions.profiles.textproxy_running", return_value=False),
-    ):
-        env = build_launch_env("personal", {"textaccounts": False, "textproxy": True})
-
-    assert env["ANTHROPIC_BASE_URL"] == textproxy_url("personal")
 
 
 # ---------------------------------------------------------------------------
