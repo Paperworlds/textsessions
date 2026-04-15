@@ -158,16 +158,29 @@ def test_build_launch_env_with_textproxy():
 
 
 def test_build_launch_env_textproxy_not_running():
-    """When textproxy is installed but not running, ANTHROPIC_BASE_URL is not set."""
+    """When textproxy is not running and no existing URL, ANTHROPIC_BASE_URL is not set."""
     with (
         patch("textsessions.profiles._HAS_TEXTACCOUNTS", False),
         patch("textsessions.profiles.os.environ", CLEAN_ENV),
-        patch("textsessions.profiles.shutil.which", side_effect=lambda cmd: "/usr/bin/textproxy" if cmd == "textproxy" else None),
         patch("textsessions.profiles.textproxy_running", return_value=False),
     ):
         env = build_launch_env("default", {"textaccounts": False, "textproxy": True})
 
     assert "ANTHROPIC_BASE_URL" not in env
+
+
+def test_build_launch_env_textproxy_url_already_set():
+    """When ANTHROPIC_BASE_URL is already pointing at localhost:7474 (e.g. set by textaccounts),
+    the profile prefix is applied even if the socket check fails."""
+    env_with_proxy = {**CLEAN_ENV, "ANTHROPIC_BASE_URL": "http://localhost:7474"}
+    with (
+        patch("textsessions.profiles._HAS_TEXTACCOUNTS", False),
+        patch("textsessions.profiles.os.environ", env_with_proxy),
+        patch("textsessions.profiles.textproxy_running", return_value=False),
+    ):
+        env = build_launch_env("personal", {"textaccounts": False, "textproxy": True})
+
+    assert env["ANTHROPIC_BASE_URL"] == "http://localhost:7474/p/personal"
 
 
 # ---------------------------------------------------------------------------
