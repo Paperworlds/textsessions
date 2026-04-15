@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import glob
 import json
 import os
+import re
+import shlex
+import shutil
+import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
-import subprocess
+import yaml
 
 import click
 from rich.console import Console
@@ -90,8 +96,6 @@ def _complete_profiles(ctx: click.Context, param: click.Parameter, incomplete: s
 @click.option("--model", "-m", default="", help="Model to pass to claude --model.")
 def new_cmd(repo_label: str, profile: str, name: str, priority: str | None, model: str) -> None:
     """Launch a new Claude Code session in a configured repo."""
-    import shlex
-    from datetime import datetime
 
     from .config import detect_claude_dirs, repo_key as _repo_key
     from .indexer import (
@@ -200,7 +204,6 @@ def init(yes: bool, recursive_dir: str, recursive_profile: str) -> None:
 
 def _init_recursive(root: Path, profile: str) -> None:
     """Find all git repos under root and add them to config."""
-    from rich.console import Console
     console = Console()
 
     if not root.exists():
@@ -236,7 +239,6 @@ def _init_recursive(root: Path, profile: str) -> None:
 @click.option("--recursive", "-r", is_flag=True, help="Scan PATH for git repos and add all")
 def add(path: str, label: str, profile: str, recursive: bool) -> None:
     """Add a repo (or directory of repos) to config."""
-    from rich.console import Console
     from .config import detect_claude_dirs
     from .indexer import reindex_repos
 
@@ -573,8 +575,7 @@ def scan_ghosts(repo_label: str, as_json: bool, do_archive: bool, do_delete: boo
             by_path.setdefault(str(s.repo_path), []).append(s)
         kept = 0
         for repo_path_str, sessions in by_path.items():
-            from pathlib import Path as _Path
-            rkey = _repo_key(_Path(repo_path_str))
+            rkey = _repo_key(Path(repo_path_str))
             index = load_index(rkey)
             for s in sessions:
                 index = do_tag(index, s.id, "keep")
@@ -655,8 +656,7 @@ def scan_ghosts(repo_label: str, as_json: bool, do_archive: bool, do_delete: boo
         for s in flagged:
             by_path.setdefault(str(s.repo_path), []).append(s)
         for repo_path_str, sessions in by_path.items():
-            from pathlib import Path as _Path
-            rkey = _repo_key(_Path(repo_path_str))
+            rkey = _repo_key(Path(repo_path_str))
             index = load_index(rkey)
             for s in sessions:
                 if s.id in index and "archived" not in index[s.id].get("tags", []):
@@ -829,13 +829,10 @@ def index_auto_rename(repo_key_arg: str | None, dry_run: bool) -> None:
     command, and applies them to index entries whose name is still a raw hex ID.
     Omit REPO-KEY to process all configured repos. Ghost sessions are skipped.
     """
-    import glob
-    import re as _re
-    from pathlib import Path
     from .config import load, repo_key
     from .indexer import do_rename, load_index, save_index, write_legacy_tsv
 
-    _HEX = _re.compile(r"^[0-9a-f]{5,8}$")
+    _HEX = re.compile(r"^[0-9a-f]{5,8}$")
     config = load()
 
     if repo_key_arg:
@@ -923,9 +920,6 @@ def search_cmd(query: str, ai_profile: str, repo_label: str, limit: int, as_json
     Sends session metadata to Claude and asks it to find relevant sessions.
     The Claude command used is configured via ui.ai_search_profile (default: claude-personal).
     """
-    import re
-    import shlex
-
     config = load()
 
     all_sessions = load_sessions(config)
@@ -1030,7 +1024,6 @@ def search_cmd(query: str, ai_profile: str, repo_label: str, limit: int, as_json
 @click.option("--include-archived", is_flag=True, help="Include archived sessions")
 def tree_cmd(output: str, repo_label: str, fmt: str, include_archived: bool) -> None:
     """Dump all repos and sessions as a YAML or JSON tree."""
-    import yaml
     from .config import load
     from .sessions import load_sessions
 
@@ -1073,9 +1066,6 @@ def tree_cmd(output: str, repo_label: str, fmt: str, include_archived: bool) -> 
 @main.command("doctor")
 def doctor_cmd() -> None:
     """Check integrations, config, and profile wiring for common problems."""
-    import shutil
-    from rich.console import Console
-
     console = Console()
     ok = True
 
