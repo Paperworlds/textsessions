@@ -13,6 +13,8 @@ from click.testing import CliRunner
 from textsessions.cli import main
 from textsessions.config import Config, ProxyConfig, RepoConfig
 
+from conftest import make_session
+
 
 def make_yaml_index(sessions: list[dict]) -> dict:
     return {
@@ -179,19 +181,11 @@ def test_scan_ghosts_delete_requires_yes(fake_env):
 
 def test_keep_tag_excludes_orphan():
     """A hex-named session tagged 'keep' must not be classified as an orphan."""
-    from pathlib import Path
-
-    from textsessions.sessions import Session
-
-    s = Session(
-        id="ac4b71c7" + "a" * 24,
-        name="ac4b7",  # 5-char hex name — would normally be an orphan
-        profile="personal",
-        last_active="2026-04-08 10:00",
-        slug="some real work",
+    s = make_session(
+        "ac4b71c7" + "a" * 24,
+        "ac4b7",  # 5-char hex name — would normally be an orphan
         tags=["keep"],
-        repo_path=Path("/nonexistent"),
-        repo_label="test",
+        slug="some real work",
     )
     assert not s.is_orphan
 
