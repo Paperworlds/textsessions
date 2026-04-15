@@ -12,14 +12,26 @@ from rich.table import Table
 
 import json as _json
 
+import subprocess as _subprocess
+
 from . import __version__
 from .config import CONFIG_PATH, RepoConfig, load, repo_key, run_init, save
+
+try:
+    _git_hash = _subprocess.check_output(
+        ["git", "rev-parse", "--short", "HEAD"],
+        stderr=_subprocess.DEVNULL,
+        text=True,
+    ).strip()
+    _version_str = f"{__version__} ({_git_hash})"
+except Exception:
+    _version_str = __version__
 from .proxy import fmt_tokens, load_all_time, load_current_session
 from .sessions import CACHE_PATH, delete_session_from_index, filter_sessions, load_sessions, load_sessions_fast, sort_by_priority
 
 
 @click.group()
-@click.version_option(__version__, "--version", "-V")
+@click.version_option(_version_str, "--version", "-V")
 def main() -> None:
     """textsessions — TUI for Claude Code session management."""
 
