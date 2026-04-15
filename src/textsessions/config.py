@@ -61,15 +61,24 @@ def load() -> Config:
         return Config()
     with open(CONFIG_PATH, "rb") as f:
         data = tomllib.load(f)
-    repos = [
-        RepoConfig(
+    raw_repos = data.get("repos", [])
+    repos = []
+    for r in raw_repos:
+        if not isinstance(r, dict):
+            raise ValueError(
+                f"config.toml: each repo entry must be a mapping, got {type(r).__name__}"
+            )
+        for key in ("path", "label"):
+            if key not in r:
+                raise ValueError(
+                    f"config.toml: repo entry is missing required key '{key}': {r}"
+                )
+        repos.append(RepoConfig(
             path=Path(r["path"]),
             label=r["label"],
             profile=r.get("profile", "work"),
             recursive=r.get("recursive", False),
-        )
-        for r in data.get("repos", [])
-    ]
+        ))
     proxy_data = data.get("proxy", {})
     proxy = ProxyConfig(
         cache_dir=Path(proxy_data.get("cache_dir", str(Path.home() / ".cache" / "textproxy")))
