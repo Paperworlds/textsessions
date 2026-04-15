@@ -140,9 +140,7 @@ def build_launch_env(profile: str, integrations_enabled: dict[str, bool]) -> dic
             except ValueError:
                 pass  # profile not found in textaccounts — fall through to tier 2/3
 
-    if integrations_enabled.get("textproxy", True):
-        existing = env.get("ANTHROPIC_BASE_URL", "")
-        if existing.startswith(TEXTPROXY_BASE_URL) or textproxy_running():
-            env["ANTHROPIC_BASE_URL"] = textproxy_url(profile)
+    if integrations_enabled.get("textproxy", True) and textproxy_running():
+        env["ANTHROPIC_BASE_URL"] = textproxy_url(profile)
 
     return env
