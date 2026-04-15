@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.8.1
+
+- `f` key in TUI opens repo filter dropdown
+- `--version` shows git commit hash (from package dir, not CWD)
+- `TEXTPROXY_BASE_URL`/`TEXTPROXY_HOST`/`TEXTPROXY_PORT` constants + `textproxy_url()` helper
+- textproxy profile URL set when proxy is running; stale `ANTHROPIC_BASE_URL` cleared when proxy is down
+- `--current-folder` auto-reindex includes subdirectory sessions (no logic duplication)
+
 ## v0.8.0
 
 Structured refactor pass — no behaviour changes.
