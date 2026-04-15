@@ -11,6 +11,8 @@ import yaml
 from textsessions.indexer import do_pin, load_index, save_index
 from textsessions.sessions import Session, _sessions_from_index, load_sessions, sort_by_priority
 
+from conftest import make_session as _make_session
+
 
 # ---------------------------------------------------------------------------
 # do_pin
@@ -58,19 +60,6 @@ def test_sessions_from_index_reads_pinned(tmp_path):
 # ---------------------------------------------------------------------------
 # Sort: pinned float to top
 # ---------------------------------------------------------------------------
-
-def _make_session(sid: str, name: str, last_active: str, pinned: bool = False, priority: str = "") -> Session:
-    return Session(
-        id=sid,
-        name=name,
-        profile="default",
-        last_active=last_active,
-        slug=name,
-        pinned=pinned,
-        priority=priority,
-        repo_path=Path("/tmp/fake"),
-    )
-
 
 def test_load_sessions_pinned_first(tmp_path):
     """Pinned session appears before more-recent unpinned sessions."""

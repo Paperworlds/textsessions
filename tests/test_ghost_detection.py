@@ -8,26 +8,7 @@ import pytest
 
 from textsessions.sessions import Session
 
-
-def make_session(
-    sid: str = "a" * 32,
-    name: str = "a1b2c",
-    slug: str = "hello there",
-    tags: list[str] | None = None,
-    priority: str = "",
-    repo_path: Path | None = None,
-) -> Session:
-    return Session(
-        id=sid,
-        name=name,
-        profile="personal",
-        last_active="2026-04-07 12:00",
-        slug=slug,
-        tags=tags or [],
-        priority=priority,
-        repo_label="test",
-        repo_path=repo_path or Path("/nonexistent/path"),
-    )
+from conftest import make_session
 
 
 class TestIsGhost:

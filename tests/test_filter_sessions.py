@@ -2,27 +2,16 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from textsessions.sessions import Session, filter_sessions
 
-
-def _s(sid: str, name: str, tags: list[str] = [], slug: str = "", description: str = "") -> Session:
-    return Session(
-        id=sid, name=name, profile="default",
-        last_active="2026-01-01 10:00",
-        slug=slug or name,
-        tags=tags,
-        description=description,
-        repo_path=Path("/tmp/fake"),
-    )
+from conftest import make_session
 
 
 SESSIONS = [
-    _s("a", "auth-work",    tags=["auth", "api"],  description="Auth refactor"),
-    _s("b", "deploy-thing", tags=["api"],           description="Deploy pipeline"),
-    _s("c", "misc-task",    tags=["infra"],         description="Some infra work"),
-    _s("d", "auth-two",     tags=["auth"],          description="Auth v2"),
+    make_session("a", "auth-work",    tags=["auth", "api"],  slug="auth-work",    description="Auth refactor"),
+    make_session("b", "deploy-thing", tags=["api"],           slug="deploy-thing", description="Deploy pipeline"),
+    make_session("c", "misc-task",    tags=["infra"],         slug="misc-task",    description="Some infra work"),
+    make_session("d", "auth-two",     tags=["auth"],          slug="auth-two",     description="Auth v2"),
 ]
 
 
