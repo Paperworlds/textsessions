@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.2
+
+- `--version` now shows git commit hash (from package dir, not CWD)
+- `TEXTPROXY_HOST`, `TEXTPROXY_PORT`, `TEXTPROXY_BASE_URL` constants + `textproxy_url()` helper — no more hardcoded URLs
+- textproxy profile URL now set whenever proxy is running, regardless of binary on PATH
+- Fixed stale env-check workaround (root cause was in textproxy's `extractProfile`)
+
 ## v0.7.1
 
 - `f` key in TUI opens a repo filter dropdown — pick any configured repo label to filter the session table, or "All repos" to clear
