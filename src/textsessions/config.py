@@ -150,8 +150,6 @@ def discover_repos_for_dir(claude_dir: Path) -> list[Path]:
     # Convert repo keys back to paths
     paths = []
     for key in keys:
-        candidate = Path(key.replace("-", "/", 1) if key.startswith("-") else key)
-        # Normalize: leading - means leading /
         candidate = Path("/" + key[1:].replace("-", "/")) if key.startswith("-") else Path(key)
         if candidate.exists() and (candidate / ".git").exists():
             paths.append(candidate)
