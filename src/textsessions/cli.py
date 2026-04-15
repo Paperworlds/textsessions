@@ -2,39 +2,36 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
+
+import subprocess
 
 import click
 from rich.console import Console
 from rich.table import Table
 
-import json as _json
-
-import subprocess as _subprocess
-from pathlib import Path as _Path
-
 from . import __version__
 from .config import CONFIG_PATH, RepoConfig, load, repo_key, run_init, save
+from .proxy import fmt_tokens, load_all_time, load_current_session
+from .sessions import CACHE_PATH, delete_session_from_index, filter_sessions, load_sessions, load_sessions_fast, sort_by_priority
 
 try:
-    _pkg_dir = _Path(__file__).parent
-    _git_hash = _subprocess.check_output(
+    _git_hash = subprocess.check_output(
         ["git", "rev-parse", "--short", "HEAD"],
-        cwd=_pkg_dir,
-        stderr=_subprocess.DEVNULL,
+        cwd=Path(__file__).parent,
+        stderr=subprocess.DEVNULL,
         text=True,
     ).strip()
     _version_str = f"{__version__} ({_git_hash})"
 except Exception:
     _version_str = __version__
-from .proxy import fmt_tokens, load_all_time, load_current_session
-from .sessions import CACHE_PATH, delete_session_from_index, filter_sessions, load_sessions, load_sessions_fast, sort_by_priority
 
 
 @click.group()
-@click.version_option(_version_str, "--version", "-V")
+@click.version_option(_version_str, "--version", "-V", prog_name="textsessions")
 def main() -> None:
     """textsessions — TUI for Claude Code session management."""
 
@@ -94,7 +91,6 @@ def _complete_profiles(ctx: click.Context, param: click.Parameter, incomplete: s
 def new_cmd(repo_label: str, profile: str, name: str, priority: str | None, model: str) -> None:
     """Launch a new Claude Code session in a configured repo."""
     import shlex
-    import subprocess
     from datetime import datetime
 
     from .config import detect_claude_dirs, repo_key as _repo_key
@@ -386,7 +382,6 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
             click.echo(f"No session matching '{resume_name}'", err=True)
             sys.exit(1)
         s = matched[0]
-        import subprocess
         from .profiles import build_launch_env, resume_cmd
         env = build_launch_env(s.profile, {"textaccounts": config.integrations.textaccounts, "textproxy": config.integrations.textproxy})
         cmd = resume_cmd(s.id, s.name, s.profile, env, config.ui.claude_cmd)
@@ -606,7 +601,7 @@ def scan_ghosts(repo_label: str, as_json: bool, do_archive: bool, do_delete: boo
             }
             for s in flagged
         ]
-        click.echo(_json.dumps(out, indent=2))
+        click.echo(json.dumps(out, indent=2))
         return
 
     console = Console()
@@ -835,7 +830,6 @@ def index_auto_rename(repo_key_arg: str | None, dry_run: bool) -> None:
     Omit REPO-KEY to process all configured repos. Ghost sessions are skipped.
     """
     import glob
-    import json as _json
     import re as _re
     from pathlib import Path
     from .config import load, repo_key
@@ -863,10 +857,10 @@ def index_auto_rename(repo_key_arg: str | None, dry_run: bool) -> None:
                 custom_title = ""
                 try:
                     for line in open(path):
-                        d = _json.loads(line)
+                        d = json.loads(line)
                         if d.get("type") == "custom-title":
                             custom_title = d.get("customTitle", "")
-                except (OSError, _json.JSONDecodeError):
+                except (OSError, json.JSONDecodeError):
                     continue
                 if custom_title:
                     titles[sid] = custom_title
@@ -931,7 +925,6 @@ def search_cmd(query: str, ai_profile: str, repo_label: str, limit: int, as_json
     """
     import re
     import shlex
-    import subprocess
 
     config = load()
 
@@ -992,7 +985,7 @@ def search_cmd(query: str, ai_profile: str, repo_label: str, limit: int, as_json
         click.echo(f"Could not parse response:\n{output}", err=True)
         sys.exit(1)
 
-    data = _json.loads(m.group())
+    data = json.loads(m.group())
     matched_ids: list[str] = data.get("matches", [])
     reason: str = data.get("reason", "")
 
@@ -1008,7 +1001,7 @@ def search_cmd(query: str, ai_profile: str, repo_label: str, limit: int, as_json
 
     if as_json:
         out = [{"id": s.id, "name": s.name, "description": s.description or s.slug, "repo": s.repo_label, "last_active": s.last_active} for s in matched]
-        click.echo(_json.dumps(out, indent=2))
+        click.echo(json.dumps(out, indent=2))
         return
 
     table = Table(show_header=True, header_style="bold")
@@ -1062,7 +1055,7 @@ def tree_cmd(output: str, repo_label: str, fmt: str, include_archived: bool) -> 
     data = {"repos": repos_tree}
 
     if fmt == "json":
-        text = _json.dumps(data, indent=2)
+        text = json.dumps(data, indent=2)
     else:
         text = yaml.dump(data, default_flow_style=False, sort_keys=False, width=120, allow_unicode=True)
 
