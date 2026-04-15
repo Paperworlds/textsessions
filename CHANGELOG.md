@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.8.0
+
+Structured refactor pass — no behaviour changes.
+
+- `STATE_DIR` defined once in `config.py`, imported everywhere (was duplicated in `indexer.py`)
+- Dead code removed: `_HEX_RE` in `indexer.py` (same pattern lives in `sessions.py` as `_HEX_RE_NAME`)
+- All inline/aliased imports in `cli.py` moved to module level; `prog_name="textsessions"` added to `--version`
+- Config `load()` now validates repo entries (raises `ValueError` on missing `path`/`label` or wrong type)
+- Dead overwritten variable removed in `discover_repos_for_dir`
+- Shared `make_session()` factory in `tests/conftest.py` — was duplicated across 3 test files
+
+**Tests — 151 passing, 1 skipped**
+
+| Area | Coverage | Notes |
+|---|---|---|
+| CLI commands | high | `scan-ghosts` (dry-run, archive, delete, keep, discard), `index`, `filter`, `pin` via `CliRunner` |
+| TUI app | medium | Startup, filter input, sort/pin/repo toggles, quit via Textual `Pilot` |
+| Config | high | Load/save roundtrip, validation errors, repo key derivation |
+| Session logic | high | Ghost/orphan detection, filter, sort, `keep` tag |
+| Not covered | — | `action_resume_session`, `action_new_session` (shell out to `claude`/`fish`) |
+
 ## v0.7.2
 
 - `--version` now shows git commit hash (from package dir, not CWD)
