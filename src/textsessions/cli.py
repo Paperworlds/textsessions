@@ -13,13 +13,16 @@ from rich.table import Table
 import json as _json
 
 import subprocess as _subprocess
+from pathlib import Path as _Path
 
 from . import __version__
 from .config import CONFIG_PATH, RepoConfig, load, repo_key, run_init, save
 
 try:
+    _pkg_dir = _Path(__file__).parent
     _git_hash = _subprocess.check_output(
         ["git", "rev-parse", "--short", "HEAD"],
+        cwd=_pkg_dir,
         stderr=_subprocess.DEVNULL,
         text=True,
     ).strip()
