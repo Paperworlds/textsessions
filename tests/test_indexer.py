@@ -579,6 +579,34 @@ class TestDoRename:
         idx = do_rename(sample_index, "aaa", "My Renamed Session")
         assert idx["aaa"]["name"] == "my-renamed-session"
 
+    def test_appends_custom_title_via_jsonl_path(self, sample_index, tmp_path):
+        """Rename uses jsonl_path stored in index to write custom-title (fast path)."""
+        jsonl = tmp_path / "aaa.jsonl"
+        jsonl.write_text("")
+        sample_index["aaa"]["jsonl_path"] = str(jsonl)
+
+        do_rename(sample_index, "aaa", "Persist This Name", repo_key="-Users-projects-foo")
+
+        lines = [json.loads(l) for l in jsonl.read_text().splitlines()]
+        assert any(l.get("type") == "custom-title" and l.get("customTitle") == "Persist This Name" for l in lines)
+
+    def test_appends_custom_title_fallback_search(self, sample_index, tmp_path):
+        """Rename falls back to searching ~/.claude* when jsonl_path is absent (e.g. subdir session)."""
+        repo_key = "-Users-projects-foo"
+        sid = "aaa"
+        # Simulate session stored under a subdirectory of the repo
+        subdir_key = repo_key + "-src-feature"
+        jsonl = tmp_path / ".claude" / "projects" / subdir_key / f"{sid}.jsonl"
+        jsonl.parent.mkdir(parents=True)
+        jsonl.write_text("")
+        # No jsonl_path in index entry — forces the fallback search path
+
+        with patch("textsessions.indexer.Path.home", return_value=tmp_path):
+            do_rename(sample_index, sid, "Persist This Name", repo_key=repo_key)
+
+        lines = [json.loads(l) for l in jsonl.read_text().splitlines()]
+        assert any(l.get("type") == "custom-title" and l.get("customTitle") == "Persist This Name" for l in lines)
+
 
 class TestDoTags:
     def test_counts_tags(self, sample_index):

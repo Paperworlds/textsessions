@@ -207,6 +207,7 @@ def scan_sessions(pairs: list[str]) -> list[dict]:
                     "profile": profile,
                     "combined": combined,
                     "custom_title": custom_title,
+                    "path": path,
                 })
     sessions.sort(key=lambda x: x["last_ts"], reverse=True)
     return sessions
@@ -255,7 +256,7 @@ def build_index(repo_key: str, pairs: list[str]) -> dict:
         last_dt = datetime.fromisoformat(s["last_ts"]).strftime("%Y-%m-%d %H:%M")
 
         old = old_index.get(sid, {})
-        entry: dict = {"name": name, "profile": prof, "last_active": last_dt, "slug": slug}
+        entry: dict = {"name": name, "profile": prof, "last_active": last_dt, "slug": slug, "jsonl_path": s["path"]}
         if ct:
             entry["description"] = ct  # auto-set from custom_title; user-set description takes precedence below
 
@@ -372,16 +373,32 @@ def do_rename(index: dict, sid: str, new_title: str, repo_key: str | None = None
     entry["name"] = make_short_name(new_title) or sid[:5]
 
     if repo_key is not None:
-        # Try to find the .jsonl across all profiles and append custom-title
-        for claude_dir in sorted(Path.home().glob(".claude*")):
-            if claude_dir.is_symlink() or not claude_dir.is_dir():
-                continue
-            candidate = claude_dir / "projects" / repo_key / f"{sid}.jsonl"
-            if candidate.exists():
-                title_entry = json.dumps({"type": "custom-title", "customTitle": new_title})
-                with open(candidate, "a") as f:
-                    f.write(title_entry + "\n")
-                break
+        # Append a custom-title entry so the rename survives a full index rebuild.
+        # Prefer the path stored in the index (set by build_index); fall back to
+        # searching ~/.claude* dirs (covers sessions not yet rebuilt, or subdirs).
+        title_entry = json.dumps({"type": "custom-title", "customTitle": new_title})
+        jsonl_path = entry.get("jsonl_path")
+        if jsonl_path and Path(jsonl_path).exists():
+            with open(jsonl_path, "a") as f:
+                f.write(title_entry + "\n")
+        else:
+            for claude_dir in sorted(Path.home().glob(".claude*")):
+                if claude_dir.is_symlink() or not claude_dir.is_dir():
+                    continue
+                projects_dir = claude_dir / "projects"
+                if not projects_dir.exists():
+                    continue
+                for child in projects_dir.iterdir():
+                    if not child.is_dir():
+                        continue
+                    if child.name != repo_key and not child.name.startswith(repo_key + "-"):
+                        continue
+                    candidate = child / f"{sid}.jsonl"
+                    if candidate.exists():
+                        with open(candidate, "a") as f:
+                            f.write(title_entry + "\n")
+                        return index
+
 
     return index
 
