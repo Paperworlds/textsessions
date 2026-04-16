@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.8.2
+
+- Fix: rename in `ts view` now persists through `ts scan` rebuilds
+- `build_index` stores `jsonl_path` in each entry; `do_rename` uses it directly (O(1)) instead of globbing `~/.claude*` dirs
+- Fixes sessions launched from repo subdirectories whose `.jsonl` was never found by the old path search
+
 ## v0.8.1
 
 - `f` key in TUI opens repo filter dropdown
