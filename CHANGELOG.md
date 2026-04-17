@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.4
+
+- tmux window names now prefix the profile's first letter: `w-pathfinder`, `p-refactor`
+- Makes it easier to tell work/personal sessions apart at a glance in the tmux status bar
+
 ## v0.8.3
 
 - Fix: rename no longer reverts after the next resume
