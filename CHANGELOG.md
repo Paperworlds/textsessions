@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.8.3
+
+- Fix: rename no longer reverts after the next resume
+- `do_rename` also updates `~/.claude*/sessions/<pid>.json` so Claude Code stops re-asserting the old launch `--name` as a fresh `custom-title` on every turn
+- Previously: a session launched with `--name presync` would overwrite a rename to `pathfinder-upgrade` on the next resume — visible most on pinned sessions (resumed more often)
+
 ## v0.8.2
 
 - Fix: rename in `ts view` now persists through `ts scan` rebuilds

@@ -360,11 +360,41 @@ def do_priority(index: dict, sid: str, level: str) -> dict:
     return index
 
 
+def _update_launch_metadata_name(sid: str, new_name: str) -> None:
+    """Update the ``name`` field in ~/.claude*/sessions/<pid>.json for *sid*.
+
+    Claude Code re-asserts the launch ``--name`` as a custom-title entry on
+    every turn/resume. Without updating this file, a rename gets reverted on
+    the next resume. Best-effort: silently skips malformed/unreadable files.
+    """
+    for claude_dir in sorted(Path.home().glob(".claude*")):
+        if claude_dir.is_symlink() or not claude_dir.is_dir():
+            continue
+        meta_dir = claude_dir / "sessions"
+        if not meta_dir.is_dir():
+            continue
+        for f in meta_dir.iterdir():
+            if f.suffix != ".json":
+                continue
+            try:
+                d = json.loads(f.read_text())
+            except (json.JSONDecodeError, OSError):
+                continue
+            if d.get("sessionId") != sid:
+                continue
+            d["name"] = new_name
+            try:
+                f.write_text(json.dumps(d))
+            except OSError:
+                pass
+
+
 def do_rename(index: dict, sid: str, new_title: str, repo_key: str | None = None) -> dict:
     """Rename a session: sets description (full label) and a short name for tab-completion.
 
     If repo_key is provided, attempts to append a custom-title entry to the
-    .jsonl file so the rename survives a full index rebuild.
+    .jsonl file so the rename survives a full index rebuild, and updates the
+    launch-metadata PID json so Claude Code stops re-asserting the old name.
     Returns the (mutated) index.
     """
     entry = index[sid]
@@ -397,8 +427,13 @@ def do_rename(index: dict, sid: str, new_title: str, repo_key: str | None = None
                     if candidate.exists():
                         with open(candidate, "a") as f:
                             f.write(title_entry + "\n")
-                        return index
+                        break
+                else:
+                    continue
+                break
 
+        # Update launch metadata so Claude Code re-asserts the NEW name, not the old.
+        _update_launch_metadata_name(sid, new_title.strip())
 
     return index
 

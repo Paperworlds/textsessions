@@ -607,6 +607,146 @@ class TestDoRename:
         lines = [json.loads(l) for l in jsonl.read_text().splitlines()]
         assert any(l.get("type") == "custom-title" and l.get("customTitle") == "Persist This Name" for l in lines)
 
+    def test_updates_launch_metadata_pid_json(self, sample_index, tmp_path):
+        """Rename also updates ~/.claude*/sessions/<pid>.json so Claude Code stops
+        re-asserting the old launch --name on every turn.
+
+        Regression: presync → pathfinder-upgrade kept reverting because Claude
+        Code writes custom-title: <launch-name> on each resume/turn.
+        """
+        sid = "aaa"
+        jsonl = tmp_path / f"{sid}.jsonl"
+        jsonl.write_text("")
+        sample_index[sid]["jsonl_path"] = str(jsonl)
+
+        meta_dir = tmp_path / ".claude" / "sessions"
+        meta_dir.mkdir(parents=True)
+        pid_file = meta_dir / "12345.json"
+        pid_file.write_text(json.dumps({"pid": 12345, "sessionId": sid, "name": "presync"}))
+
+        with patch("textsessions.indexer.Path.home", return_value=tmp_path):
+            do_rename(sample_index, sid, "pathfinder-upgrade", repo_key="-Users-projects-foo")
+
+        updated = json.loads(pid_file.read_text())
+        assert updated["name"] == "pathfinder-upgrade"
+        assert updated["sessionId"] == sid  # sanity — didn't corrupt the file
+
+    def test_does_not_touch_other_sessions_pid_json(self, sample_index, tmp_path):
+        """Only the matching sessionId's PID json gets updated."""
+        sid = "aaa"
+        jsonl = tmp_path / f"{sid}.jsonl"
+        jsonl.write_text("")
+        sample_index[sid]["jsonl_path"] = str(jsonl)
+
+        meta_dir = tmp_path / ".claude" / "sessions"
+        meta_dir.mkdir(parents=True)
+        (meta_dir / "12345.json").write_text(json.dumps({"pid": 12345, "sessionId": sid, "name": "old"}))
+        other_pid = meta_dir / "99999.json"
+        other_pid.write_text(json.dumps({"pid": 99999, "sessionId": "other-sid", "name": "untouched"}))
+
+        with patch("textsessions.indexer.Path.home", return_value=tmp_path):
+            do_rename(sample_index, sid, "renamed", repo_key="-Users-projects-foo")
+
+        other = json.loads(other_pid.read_text())
+        assert other["name"] == "untouched"
+
+    def test_updates_pid_json_across_multiple_claude_dirs(self, sample_index, tmp_path):
+        """Launch metadata can live in .claude, .claude-work, .claude-personal etc."""
+        sid = "aaa"
+        jsonl = tmp_path / f"{sid}.jsonl"
+        jsonl.write_text("")
+        sample_index[sid]["jsonl_path"] = str(jsonl)
+
+        for subdir in (".claude-work", ".claude-personal"):
+            meta_dir = tmp_path / subdir / "sessions"
+            meta_dir.mkdir(parents=True)
+            (meta_dir / "1.json").write_text(
+                json.dumps({"sessionId": sid, "name": "stale-launch-name"})
+            )
+
+        with patch("textsessions.indexer.Path.home", return_value=tmp_path):
+            do_rename(sample_index, sid, "renamed", repo_key="-Users-projects-foo")
+
+        for subdir in (".claude-work", ".claude-personal"):
+            pid_file = tmp_path / subdir / "sessions" / "1.json"
+            assert json.loads(pid_file.read_text())["name"] == "renamed"
+
+    def test_skips_malformed_pid_json_gracefully(self, sample_index, tmp_path):
+        """Malformed PID json must not crash rename; valid ones still update."""
+        sid = "aaa"
+        jsonl = tmp_path / f"{sid}.jsonl"
+        jsonl.write_text("")
+        sample_index[sid]["jsonl_path"] = str(jsonl)
+
+        meta_dir = tmp_path / ".claude" / "sessions"
+        meta_dir.mkdir(parents=True)
+        (meta_dir / "broken.json").write_text("{not valid json")
+        good = meta_dir / "good.json"
+        good.write_text(json.dumps({"sessionId": sid, "name": "old"}))
+
+        with patch("textsessions.indexer.Path.home", return_value=tmp_path):
+            do_rename(sample_index, sid, "renamed", repo_key="-Users-projects-foo")
+
+        assert json.loads(good.read_text())["name"] == "renamed"
+
+    def test_rename_survives_simulated_claude_rewrite(self, sample_index, tmp_path):
+        """Regression: after rename, if Claude Code writes a fresh custom-title
+        matching the (now-updated) launch name, the rename must survive.
+
+        Before the fix, launch name stayed as 'presync' and the re-asserted
+        custom-title reverted the rename. After the fix, launch name matches
+        the new title so re-asserts are idempotent.
+        """
+        from textsessions.indexer import build_index
+
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        sessions_dir = claude_dir / "projects" / "test-repo"
+        sessions_dir.mkdir(parents=True)
+
+        sid = "ab12cd34" + "0" * 28
+        jsonl = sessions_dir / f"{sid}.jsonl"
+        jsonl.write_text("\n".join([
+            json.dumps({"type": "user", "timestamp": "2026-04-17T10:00:00Z",
+                        "message": {"content": "Help me debug"}}),
+            json.dumps({"type": "custom-title", "timestamp": "2026-04-17T10:00:01Z",
+                        "customTitle": "presync"}),
+        ]) + "\n")
+
+        meta_dir = claude_dir / "sessions"
+        meta_dir.mkdir()
+        pid_file = meta_dir / "12345.json"
+        pid_file.write_text(json.dumps({"pid": 12345, "sessionId": sid, "name": "presync"}))
+
+        state_dir = tmp_path / "state"
+        pairs = [f"{claude_dir}::{sessions_dir}"]
+
+        with patch("textsessions.indexer.STATE_DIR", state_dir), \
+             patch("textsessions.indexer.LEGACY_INDEX_DIR", tmp_path / "legacy"):
+            index = build_index("test-repo", pairs)
+            assert index[sid]["name"] == "presync"
+
+            # User renames via TUI
+            with patch("textsessions.indexer.Path.home", return_value=tmp_path):
+                do_rename(index, sid, "pathfinder-upgrade", repo_key="test-repo")
+            save_index("test-repo", index)
+
+            # Simulate Claude Code writing a fresh custom-title on next turn —
+            # it reads the PID json's name and echoes it into the jsonl.
+            launch_name = json.loads(pid_file.read_text())["name"]
+            with open(jsonl, "a") as f:
+                f.write(json.dumps({
+                    "type": "custom-title",
+                    "timestamp": "2026-04-17T11:00:00Z",
+                    "customTitle": launch_name,
+                }) + "\n")
+
+            rebuilt = build_index("test-repo", pairs)
+
+        # The rename must survive Claude's re-assertion on next turn.
+        assert rebuilt[sid]["name"] == "pathfinder-upgrade"
+        assert rebuilt[sid]["description"] == "pathfinder-upgrade"
+
 
 class TestDoTags:
     def test_counts_tags(self, sample_index):
