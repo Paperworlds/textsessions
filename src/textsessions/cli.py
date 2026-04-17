@@ -168,7 +168,11 @@ def new_cmd(repo_label: str, profile: str, name: str, priority: str | None, mode
         fish_parts += ["--name", shlex.quote(name)]
     if model:
         fish_parts += ["--model", shlex.quote(model)]
-    cmd = ["fish", "-c", " ".join(fish_parts)]
+    # Prepend any env vars that fish's config.fish might override (e.g. ANTHROPIC_BASE_URL).
+    fish_prefix = ""
+    if "ANTHROPIC_BASE_URL" in env:
+        fish_prefix = f"set -x ANTHROPIC_BASE_URL {shlex.quote(env['ANTHROPIC_BASE_URL'])}; "
+    cmd = ["fish", "-c", fish_prefix + " ".join(fish_parts)]
 
     # Launch
     result = subprocess.run(cmd, env=env, cwd=repo.path)
