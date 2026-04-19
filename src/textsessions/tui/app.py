@@ -276,7 +276,11 @@ class TextSessionsApp(ActionsMixin, App):
             cols.append("Repo")
         cols += ["Profile / Tags", "Pri", "Last Active"]
         table.add_columns(*cols)
+        seen_ids: set[str] = set()
         for s in self._filtered:
+            if s.id in seen_ids:
+                continue  # parent+child repo overlap — deduplicated in load_sessions but guard here too
+            seen_ids.add(s.id)
             pri = s.display_priority
             label = (s.description if s.description else s.name)[:35]
             if s.pinned and self._show_pinned:

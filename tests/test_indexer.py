@@ -496,6 +496,56 @@ def test_build_index_updates_name_when_custom_title_changes(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# load_sessions deduplication
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(not importable("tomli_w"), reason="tomli_w not installed")
+def test_load_sessions_deduplicates_same_sid_across_repos(tmp_path):
+    """Regression: parent repo + explicitly-configured child repo can both index
+    the same session ID (DuplicateKey crash in DataTable). load_sessions must
+    return each session ID at most once.
+
+    Reproduces the crash seen with personal/.yaml and
+    personal-paperworlds-textread.yaml both containing '051f094e-…'.
+    """
+    from textsessions.config import Config, ProxyConfig, RepoConfig
+    from textsessions.sessions import load_sessions
+
+    shared_sid = "051f094e-1520-4b46-b009-1369dea3e0fc"
+
+    parent_path = tmp_path / "personal"
+    parent_path.mkdir()
+    child_path = tmp_path / "personal" / "textread"
+    child_path.mkdir()
+
+    parent_rk = str(parent_path).replace("/", "-")
+    child_rk = str(child_path).replace("/", "-")
+
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+
+    # Same session ID in both YAML indexes
+    entry = {"name": "read-lead", "profile": "personal", "last_active": "2026-04-18 20:34",
+             "slug": "read lead sync"}
+    (state_dir / f"{parent_rk}.yaml").write_text(yaml.safe_dump({shared_sid: entry}))
+    (state_dir / f"{child_rk}.yaml").write_text(yaml.safe_dump({shared_sid: entry}))
+
+    config = Config(
+        repos=[
+            RepoConfig(path=parent_path, label="personal", profile="personal"),
+            RepoConfig(path=child_path, label="textread", profile="personal"),
+        ],
+        proxy=ProxyConfig(cache_dir=tmp_path / "proxy"),
+    )
+
+    with patch("textsessions.sessions.STATE_DIR", state_dir):
+        sessions = load_sessions(config)
+
+    ids = [s.id for s in sessions]
+    assert ids.count(shared_sid) == 1, f"Expected 1 occurrence of sid, got {ids.count(shared_sid)}"
+
+
+# ---------------------------------------------------------------------------
 # load_index / save_index
 # ---------------------------------------------------------------------------
 

@@ -106,7 +106,11 @@ class ActionsMixin:
         try:
             self.notify("Reindexing…", severity="information")
             claude_dirs = detect_claude_dirs()
-            count = reindex_repos(expanded, claude_dirs)
+            # Pass all_repos so reindex_repos knows the full configured set —
+            # without this, a partial reindex (filtered to one repo) doesn't
+            # know about sibling repos, causing parent repos to absorb child
+            # repo sessions and produce duplicate session IDs across YAML files.
+            count = reindex_repos(expanded, claude_dirs, all_repos=self._config.repos)
             self._reload_sessions()
             self.notify(f"Reindexed — {count} sessions", severity="information")
         except Exception as e:

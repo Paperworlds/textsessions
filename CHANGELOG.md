@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.6
+
+- Fix: DuplicateKey crash when a parent repo and a child repo both index the same session ID
+- `load_sessions` now deduplicates by session ID (last/child entry wins)
+- `_populate_table` adds a second-layer guard so the TUI never raises DuplicateKey regardless of upstream state
+- `action_reindex` now passes `all_repos` to `reindex_repos` so partial reindex (filtered to one repo) no longer incorrectly absorbs child repo sessions into the parent YAML
+
 ## v0.8.4
 
 - tmux window names now prefix the profile's first letter: `w-pathfinder`, `p-refactor`

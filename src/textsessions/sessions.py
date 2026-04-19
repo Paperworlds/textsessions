@@ -146,6 +146,15 @@ def load_sessions(config: Config, show_archived: bool = False) -> list[Session]:
         sessions = _sessions_from_index(yaml_path, repo.label, repo.path)
         all_sessions.extend(sessions)
 
+    # Deduplicate by session ID — parent and child repos can both index the same
+    # session (e.g. personal/ and personal/textread/ both track session 051f094e).
+    # First occurrence wins (more specific repos tend to appear later in config,
+    # so we keep the last to prefer the child's richer metadata).
+    seen: dict[str, Session] = {}
+    for s in all_sessions:
+        seen[s.id] = s  # last writer wins — child repo entry preferred
+    all_sessions = list(seen.values())
+
     all_sessions = _sort_sessions(all_sessions)
     if not show_archived:
         all_sessions = [s for s in all_sessions if not s.is_archived]

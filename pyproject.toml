@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "textsessions"
-version = "0.8.5"
+version = "0.8.6"
 description = "A Textual TUI for managing Claude Code sessions"
 requires-python = ">=3.12"
 dependencies = [
