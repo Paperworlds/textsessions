@@ -1063,6 +1063,20 @@ def tree_cmd(output: str, repo_label: str, fmt: str, include_archived: bool) -> 
 
 
 # ---------------------------------------------------------------------------
+# Repos command — CLI contract for tw repo import
+# ---------------------------------------------------------------------------
+
+
+@main.command("repos")
+def repos_cmd() -> None:
+    """Print REPO lines for all known repos (used by tw repo import)."""
+    config = load()
+    for repo in config.repos:
+        meta = f" profile={repo.profile}" if repo.profile else ""
+        click.echo(f"REPO {repo.label} {repo.path}{meta}")
+
+
+# ---------------------------------------------------------------------------
 # Doctor command
 # ---------------------------------------------------------------------------
 
