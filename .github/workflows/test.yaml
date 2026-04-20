@@ -17,6 +17,6 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -e ".[accounts]"
-          pip install pytest
+          pip install pytest pytest-asyncio
       - name: Run tests
         run: python -m pytest tests/ -v

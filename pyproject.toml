@@ -49,5 +49,5 @@ dev = [
 textaccounts = { path = "../textaccounts", editable = true }
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "tests"]
 asyncio_mode = "auto"

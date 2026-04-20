@@ -367,11 +367,10 @@ Start with the ones that solve the most common pain points for heavy Claude Code
 - [ ] Refactor config screen from subprocess to pushed Screen (removes brief flash on `c` key, enables Enter-to-filter)
 - [ ] Polish rename flow — reindex now auto-renames hex sessions from `/rename`, but edge cases remain: TUI `r` key doesn't update the tmux window name, stale tab-completion names after rename, and `auto-rename --dry-run` output could be clearer
 
-## Part of paperworlds
-
-textsessions is part of [paperworlds](https://github.com/paperworlds) — an open org building tools and games around AI agents and text interfaces.
-
----
+> [!NOTE]
+> **Part of Paperworlds**
+>
+> textsessions is part of [Paperworlds](https://github.com/paperworlds) — an open org building tools and games around AI agents and text interfaces.
 
 ## License
 
