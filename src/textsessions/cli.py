@@ -1120,6 +1120,7 @@ def repo_move(label: str, new_path: str) -> None:
 
     old_key = repo_key(old_path)
     new_key = repo_key(dest)
+    console = Console()
 
     # 1. Rename Claude project directories across all claude config dirs
     claude_dirs = detect_claude_dirs()
@@ -1127,23 +1128,39 @@ def repo_move(label: str, new_path: str) -> None:
         old_proj = claude_dir / "projects" / old_key
         new_proj = claude_dir / "projects" / new_key
         if old_proj.exists() and not new_proj.exists():
-            old_proj.rename(new_proj)
-            click.echo(f"  Renamed {old_proj} → {new_proj}")
+            try:
+                old_proj.rename(new_proj)
+                console.print(f"  [green]✓[/green] claude projects: {old_key} → {new_key}  [dim]({claude_dir.name})[/dim]")
+            except OSError as e:
+                console.print(f"  [red]✗[/red] claude projects rename failed in {claude_dir.name}: {e}")
         elif old_proj.exists() and new_proj.exists():
-            click.echo(f"  Warning: both {old_key} and {new_key} exist in {claude_dir}/projects — skipped rename")
+            console.print(f"  [yellow]![/yellow] both project dirs exist in {claude_dir.name} — skipped (merge manually if needed)")
+        else:
+            console.print(f"  [dim]-[/dim] no project dir for old path in {claude_dir.name} (skipped)")
 
     # 2. Rename the session YAML index
     old_yaml = STATE_DIR / f"{old_key}.yaml"
     new_yaml = STATE_DIR / f"{new_key}.yaml"
     if old_yaml.exists() and not new_yaml.exists():
-        old_yaml.rename(new_yaml)
-        click.echo(f"  Renamed index {old_yaml.name} → {new_yaml.name}")
+        try:
+            old_yaml.rename(new_yaml)
+            console.print(f"  [green]✓[/green] session index: {old_yaml.name} → {new_yaml.name}")
+        except OSError as e:
+            console.print(f"  [red]✗[/red] session index rename failed: {e}")
+    elif old_yaml.exists() and new_yaml.exists():
+        console.print(f"  [yellow]![/yellow] session index already exists for new path — skipped")
+    else:
+        console.print(f"  [dim]-[/dim] no session index for old path (skipped)")
 
     # 3. Update config and reindex
     repo.path = dest
     save(config)
-    reindex_repos([repo], claude_dirs, all_repos=config.repos)
-    click.echo(f"Updated '{label}': {old_path} → {dest}")
+    try:
+        reindex_repos([repo], claude_dirs, all_repos=config.repos)
+        console.print(f"  [green]✓[/green] reindexed")
+    except Exception as e:
+        console.print(f"  [yellow]![/yellow] reindex failed: {e} — run: textsessions reindex --repo {label}")
+    console.print(f"[green]Done[/green]  '{label}': {old_path} → {dest}")
 
 
 # ---------------------------------------------------------------------------
