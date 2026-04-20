@@ -265,9 +265,10 @@ class ActionsMixin:
             "textproxy": self._config.integrations.textproxy,
         })
         cmd = resume_cmd(resume_id, s.name, profile, env, self._config.ui.claude_cmd)
-        cwd = s.repo_path if s.repo_path.exists() else Path.home()
-        if cwd == Path.home():
-            self.notify(f"Repo path missing — resuming from $HOME", severity="warning")
+        cwd = s.repo_path
+        if not cwd.exists():
+            cwd.mkdir(parents=True, exist_ok=True)
+            self.notify(f"Repo path missing — created empty dir: {cwd}", severity="warning")
         with self.suspend():
             result = subprocess.run(cmd, env=env, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, cwd=cwd)
         if result.returncode != 0:
