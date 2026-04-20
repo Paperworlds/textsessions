@@ -436,16 +436,17 @@ def _resolve_session_by_name(name: str, config):
 def rename_cmd(name: str, new_title: tuple[str, ...]) -> None:
     """Rename a session by name."""
     from .config import repo_key as _repo_key
-    from .indexer import do_rename, load_index, save_index, write_legacy_tsv
+    from .indexer import do_rename, mutate_index
     title = " ".join(new_title)
     config = load()
     s = _resolve_session_by_name(name, config)
     rk = _repo_key(s.repo_path)
-    index = load_index(rk)
-    index = do_rename(index, s.id, title, repo_key=rk)
-    save_index(rk, index)
-    write_legacy_tsv(rk, index)
-    click.echo(f"  {s.id[:8]}  → {index[s.id]['name']}  [{title}]")
+    result: dict = {}
+    def _rename(index, sid):
+        do_rename(index, sid, title, repo_key=rk)
+        result["name"] = index[sid]["name"]
+    mutate_index(rk, s.id, _rename)
+    click.echo(f"  {s.id[:8]}  → {result['name']}  [{title}]")
 
 
 @main.command("tag")
@@ -454,21 +455,22 @@ def rename_cmd(name: str, new_title: tuple[str, ...]) -> None:
 def tag_cmd(name: str, tags_csv: str) -> None:
     """Add or remove tags on a session (prefix with - to remove, e.g. auth,-old)."""
     from .config import repo_key as _repo_key
-    from .indexer import do_tag, do_untag, load_index, save_index, write_legacy_tsv
+    from .indexer import do_tag, do_untag, mutate_index
     config = load()
     s = _resolve_session_by_name(name, config)
     rk = _repo_key(s.repo_path)
-    index = load_index(rk)
     parts = [t.strip() for t in tags_csv.split(",") if t.strip()]
     to_add = [t for t in parts if not t.startswith("-")]
     to_remove = [t[1:] for t in parts if t.startswith("-")]
-    if to_add:
-        index = do_tag(index, s.id, ",".join(to_add))
-    if to_remove:
-        index = do_untag(index, s.id, ",".join(to_remove))
-    save_index(rk, index)
-    write_legacy_tsv(rk, index)
-    remaining = index[s.id].get("tags", [])
+    result: dict = {}
+    def apply(index, sid):
+        if to_add:
+            do_tag(index, sid, ",".join(to_add))
+        if to_remove:
+            do_untag(index, sid, ",".join(to_remove))
+        result["tags"] = index[sid].get("tags", [])
+    mutate_index(rk, s.id, apply)
+    remaining = result["tags"]
     click.echo(f"  {s.id[:8]}  tags: {', '.join(remaining) if remaining else '(none)'}")
 
 
