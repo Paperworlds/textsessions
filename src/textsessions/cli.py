@@ -387,19 +387,19 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
             click.echo(f"No session matching '{resume_name}'", err=True)
             sys.exit(1)
         s = matched[0]
-        if not s.repo_path.exists():
+        cwd = s.repo_path
+        if not cwd.exists():
             click.echo(
-                f"Error: repo path no longer exists: {s.repo_path}\n"
-                f"  Session '{s.name}' belongs to repo '{s.repo_label}'.\n"
-                f"  If the folder moved, update it with:\n"
+                f"Warning: repo path no longer exists: {cwd}\n"
+                f"  Resuming from $HOME. To fix permanently:\n"
                 f"    textsessions repo move {s.repo_label} /new/path",
                 err=True,
             )
-            sys.exit(1)
+            cwd = Path.home()
         from .profiles import build_launch_env, resume_cmd
         env = build_launch_env(s.profile, {"textaccounts": config.integrations.textaccounts, "textproxy": config.integrations.textproxy})
         cmd = resume_cmd(s.id, s.name, s.profile, env, config.ui.claude_cmd)
-        sys.exit(subprocess.run(cmd, env=env, cwd=s.repo_path).returncode)
+        sys.exit(subprocess.run(cmd, env=env, cwd=cwd).returncode)
 
     filtered = filter_sessions(all_sessions, query=query, tag=tag, profile=profile, repo_label=repo)
     if by_priority:
