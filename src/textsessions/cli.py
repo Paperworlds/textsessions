@@ -1142,7 +1142,7 @@ def repo_move(label: str, new_path: str) -> None:
     # 3. Update config and reindex
     repo.path = dest
     save(config)
-    reindex_repos([dest], claude_dirs, all_repos=config.repos)
+    reindex_repos([repo], claude_dirs, all_repos=config.repos)
     click.echo(f"Updated '{label}': {old_path} → {dest}")
 
 
