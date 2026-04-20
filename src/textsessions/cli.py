@@ -504,6 +504,127 @@ def proxy() -> None:
     console.print()
 
 
+def _scan_ghosts_keep(all_sessions: list, keep_prefix: str, repo_label: str) -> None:
+    """--keep mode: tag one session as 'keep' to permanently exclude from orphan detection."""
+    from .indexer import do_tag, load_index, save_index, write_legacy_tsv
+    from .config import repo_key as _repo_key
+    if not repo_label:
+        click.echo("--repo is required when using --keep", err=True)
+        sys.exit(1)
+    matched = [s for s in all_sessions if s.id.startswith(keep_prefix)]
+    if not matched:
+        matched = [s for s in all_sessions if s.name.startswith(keep_prefix)]
+    if not matched:
+        click.echo(f"No session matching '{keep_prefix}'", err=True)
+        sys.exit(1)
+    s = matched[0]
+    rkey = _repo_key(s.repo_path)
+    index = load_index(rkey)
+    index = do_tag(index, s.id, "keep")
+    save_index(rkey, index)
+    write_legacy_tsv(rkey, index)
+    console = Console()
+    console.print(f"Kept: {s.short_id}  {s.slug[:40]!r}")
+
+
+def _scan_ghosts_keep_all(all_sessions: list, repo_label: str) -> None:
+    """--keep-all mode: tag every detected orphan in the repo as 'keep'."""
+    from .indexer import do_tag, load_index, save_index, write_legacy_tsv
+    from .config import repo_key as _repo_key
+    if not repo_label:
+        click.echo("--repo is required when using --keep-all", err=True)
+        sys.exit(1)
+    orphans_to_keep = [s for s in all_sessions if not s.is_ghost and s.is_orphan]
+    if not orphans_to_keep:
+        click.echo(f"No orphans found in {repo_label}.")
+        return
+    by_path: dict[str, list] = {}
+    for s in orphans_to_keep:
+        by_path.setdefault(str(s.repo_path), []).append(s)
+    kept = 0
+    for repo_path_str, sessions in by_path.items():
+        rkey = _repo_key(Path(repo_path_str))
+        index = load_index(rkey)
+        for s in sessions:
+            index = do_tag(index, s.id, "keep")
+            kept += 1
+        save_index(rkey, index)
+        write_legacy_tsv(rkey, index)
+    console = Console()
+    console.print(f"[green]Kept {kept} orphans in {repo_label}.[/green]")
+
+
+def _scan_ghosts_report(flagged: list, by_repo: dict, as_json: bool, console: "Console") -> None:  # type: ignore[name-defined]
+    """Dry-run report: print a summary of ghosts and orphans."""
+    ghosts = [s for s in flagged if s.is_ghost]
+    orphans = [s for s in flagged if not s.is_ghost]
+    if as_json:
+        out = [
+            {
+                "id": s.id,
+                "name": s.name,
+                "repo": s.repo_label,
+                "kind": "ghost" if s.is_ghost else "orphan",
+                "last_active": s.last_active,
+                "slug": s.slug,
+            }
+            for s in flagged
+        ]
+        click.echo(json.dumps(out, indent=2))
+        return
+    total_ghosts = len(ghosts)
+    total_orphans = len(orphans)
+    for label, sessions in sorted(by_repo.items()):
+        r_ghosts = sum(1 for s in sessions if s.is_ghost)
+        r_orphans = sum(1 for s in sessions if not s.is_ghost)
+        console.print(f"\n[bold]{label}[/bold]  [dim]({r_ghosts} ghosts, {r_orphans} orphans)[/dim]")
+        for s in sessions[:20]:
+            kind = "[red]ghost [/red]" if s.is_ghost else "[yellow]orphan[/yellow]"
+            console.print(f"  [{kind}]  [dim]{s.id[:8]}[/dim]  {s.last_active}  {s.slug[:60]!r}")
+        if len(sessions) > 20:
+            console.print(f"  [dim]... {len(sessions) - 20} more[/dim]")
+    console.print(f"\n[bold]Total:[/bold] {total_ghosts} ghosts, {total_orphans} orphans across {len(by_repo)} repos\n")
+
+
+def _scan_ghosts_delete(flagged: list, yes: bool, console: "Console") -> None:  # type: ignore[name-defined]
+    """--delete mode: hard-remove sessions from YAML index."""
+    if not yes:
+        click.confirm(
+            f"Permanently delete {len(flagged)} sessions? This cannot be undone.\n"
+            "  Tip: --archive is reversible and recommended instead.",
+            abort=True,
+        )
+    deleted = 0
+    for s in flagged:
+        if delete_session_from_index(s.repo_path, s.id):
+            deleted += 1
+    console.print(f"[green]Deleted {deleted} sessions.[/green]")
+
+
+def _scan_ghosts_archive(flagged: list, repo_label: str, do_discard: bool, console: "Console") -> None:  # type: ignore[name-defined]
+    """--archive/--discard mode: tag sessions as 'archived'."""
+    from .indexer import do_tag, load_index, save_index, write_legacy_tsv
+    from .config import repo_key as _repo_key
+    archived = 0
+    # Group by repo_path to batch index loads
+    by_path: dict[str, list] = {}
+    for s in flagged:
+        by_path.setdefault(str(s.repo_path), []).append(s)
+    for repo_path_str, sessions in by_path.items():
+        rkey = _repo_key(Path(repo_path_str))
+        index = load_index(rkey)
+        for s in sessions:
+            if s.id in index and "archived" not in index[s.id].get("tags", []):
+                index = do_tag(index, s.id, "archived")
+                archived += 1
+        save_index(rkey, index)
+        write_legacy_tsv(rkey, index)
+    if do_discard and repo_label:
+        console.print(f"[green]Archived {archived} orphans in {repo_label}.[/green]")
+    else:
+        console.print(f"[green]Archived {archived} sessions.[/green]")
+
+
 @main.command("scan-ghosts")
 @click.option("--repo", "-r", "repo_label", default="", help="Limit to one repo label")
 @click.option("--json", "as_json", is_flag=True, help="Machine-readable output")
@@ -537,97 +658,26 @@ def scan_ghosts(repo_label: str, as_json: bool, do_archive: bool, do_delete: boo
     if repo_label:
         all_sessions = [s for s in all_sessions if s.repo_label == repo_label or s.repo_label.startswith(repo_label + "/")]
 
-    # --keep: tag one session as 'keep' to permanently exclude from orphan detection
     if keep_prefix:
-        if not repo_label:
-            click.echo("--repo is required when using --keep", err=True)
-            sys.exit(1)
-        from .indexer import do_tag, load_index, save_index, write_legacy_tsv
-        from .config import repo_key as _repo_key
-        matched = [s for s in all_sessions if s.id.startswith(keep_prefix)]
-        if not matched:
-            matched = [s for s in all_sessions if s.name.startswith(keep_prefix)]
-        if not matched:
-            click.echo(f"No session matching '{keep_prefix}'", err=True)
-            sys.exit(1)
-        s = matched[0]
-        rkey = _repo_key(s.repo_path)
-        index = load_index(rkey)
-        index = do_tag(index, s.id, "keep")
-        save_index(rkey, index)
-        write_legacy_tsv(rkey, index)
-        console = Console()
-        console.print(f"Kept: {s.short_id}  {s.slug[:40]!r}")
+        _scan_ghosts_keep(all_sessions, keep_prefix, repo_label)
         return
 
-    # --keep-all: tag every detected orphan in the repo as 'keep'
     if do_keep_all:
-        if not repo_label:
-            click.echo("--repo is required when using --keep-all", err=True)
-            sys.exit(1)
-        from .indexer import do_tag, load_index, save_index, write_legacy_tsv
-        from .config import repo_key as _repo_key
-        orphans_to_keep = [s for s in all_sessions if not s.is_ghost and s.is_orphan]
-        if not orphans_to_keep:
-            click.echo(f"No orphans found in {repo_label}.")
-            return
-        by_path: dict[str, list] = {}
-        for s in orphans_to_keep:
-            by_path.setdefault(str(s.repo_path), []).append(s)
-        kept = 0
-        for repo_path_str, sessions in by_path.items():
-            rkey = _repo_key(Path(repo_path_str))
-            index = load_index(rkey)
-            for s in sessions:
-                index = do_tag(index, s.id, "keep")
-                kept += 1
-            save_index(rkey, index)
-            write_legacy_tsv(rkey, index)
-        console = Console()
-        console.print(f"[green]Kept {kept} orphans in {repo_label}.[/green]")
+        _scan_ghosts_keep_all(all_sessions, repo_label)
         return
 
     ghosts = [s for s in all_sessions if s.is_ghost]
     orphans = [s for s in all_sessions if not s.is_ghost and s.is_orphan]
     flagged = ghosts + orphans
 
-    if as_json:
-        out = [
-            {
-                "id": s.id,
-                "name": s.name,
-                "repo": s.repo_label,
-                "kind": "ghost" if s.is_ghost else "orphan",
-                "last_active": s.last_active,
-                "slug": s.slug,
-            }
-            for s in flagged
-        ]
-        click.echo(json.dumps(out, indent=2))
-        return
-
-    console = Console()
-
     by_repo: dict[str, list] = {}
     for s in flagged:
         by_repo.setdefault(s.repo_label, []).append(s)
 
-    total_ghosts = len(ghosts)
-    total_orphans = len(orphans)
+    console = Console()
+    _scan_ghosts_report(flagged, by_repo, as_json, console)
 
-    for label, sessions in sorted(by_repo.items()):
-        r_ghosts = sum(1 for s in sessions if s.is_ghost)
-        r_orphans = sum(1 for s in sessions if not s.is_ghost)
-        console.print(f"\n[bold]{label}[/bold]  [dim]({r_ghosts} ghosts, {r_orphans} orphans)[/dim]")
-        for s in sessions[:20]:
-            kind = "[red]ghost [/red]" if s.is_ghost else "[yellow]orphan[/yellow]"
-            console.print(f"  [{kind}]  [dim]{s.id[:8]}[/dim]  {s.last_active}  {s.slug[:60]!r}")
-        if len(sessions) > 20:
-            console.print(f"  [dim]... {len(sessions) - 20} more[/dim]")
-
-    console.print(f"\n[bold]Total:[/bold] {total_ghosts} ghosts, {total_orphans} orphans across {len(by_repo)} repos\n")
-
-    if not flagged:
+    if as_json or not flagged:
         return
 
     if not do_archive and not do_delete and not do_discard:
@@ -635,40 +685,11 @@ def scan_ghosts(repo_label: str, as_json: bool, do_archive: bool, do_delete: boo
         return
 
     if do_delete:
-        if not yes:
-            click.confirm(
-                f"Permanently delete {len(flagged)} sessions? This cannot be undone.\n"
-                "  Tip: --archive is reversible and recommended instead.",
-                abort=True,
-            )
-        deleted = 0
-        for s in flagged:
-            if delete_session_from_index(s.repo_path, s.id):
-                deleted += 1
-        console.print(f"[green]Deleted {deleted} sessions.[/green]")
+        _scan_ghosts_delete(flagged, yes, console)
         return
 
     if do_archive or do_discard:
-        from .indexer import do_tag, load_index, save_index, write_legacy_tsv
-        from .config import repo_key as _repo_key
-        archived = 0
-        # Group by repo_path to batch index loads
-        by_path: dict[str, list] = {}
-        for s in flagged:
-            by_path.setdefault(str(s.repo_path), []).append(s)
-        for repo_path_str, sessions in by_path.items():
-            rkey = _repo_key(Path(repo_path_str))
-            index = load_index(rkey)
-            for s in sessions:
-                if s.id in index and "archived" not in index[s.id].get("tags", []):
-                    index = do_tag(index, s.id, "archived")
-                    archived += 1
-            save_index(rkey, index)
-            write_legacy_tsv(rkey, index)
-        if do_discard and repo_label:
-            console.print(f"[green]Archived {archived} orphans in {repo_label}.[/green]")
-        else:
-            console.print(f"[green]Archived {archived} sessions.[/green]")
+        _scan_ghosts_archive(flagged, repo_label, do_discard, console)
 
 
 @main.command()
