@@ -35,6 +35,29 @@ except Exception:
     _version_str = __version__
 
 
+def _resolve_repo_from_cwd(config, *, add_hint: str = "Run: textsessions add .") -> RepoConfig:
+    """Return the deepest configured repo whose path contains CWD, or exit."""
+    cwd = Path.cwd()
+    best: RepoConfig | None = None
+    best_len = -1
+    for r in config.repos:
+        try:
+            cwd.relative_to(r.path)
+        except ValueError:
+            continue
+        parts = len(r.path.parts)
+        if parts > best_len:
+            best_len = parts
+            best = r
+    if best is None:
+        click.echo(f"No configured repo matches current directory ({cwd}).", err=True)
+        click.echo(add_hint, err=True)
+        sys.exit(1)
+    if best.path != cwd and (cwd / ".git").exists():
+        click.echo(f"Note: '{cwd.name}' is not configured — matched parent '{best.label}'. Run: textsessions add .", err=True)
+    return best
+
+
 @click.group()
 @click.version_option(_version_str, "--version", "-V", prog_name="textsessions")
 def main() -> None:
@@ -122,25 +145,7 @@ def new_cmd(repo_label: str, profile: str, name: str, priority: str | None, mode
             sys.exit(1)
         repo = matched_repos[0]
     else:
-        cwd = Path.cwd()
-        best: RepoConfig | None = None
-        best_len = -1
-        for r in config.repos:
-            try:
-                cwd.relative_to(r.path)
-            except ValueError:
-                continue
-            parts = len(r.path.parts)
-            if parts > best_len:
-                best_len = parts
-                best = r
-        if best is None:
-            click.echo(f"No configured repo matches current directory ({cwd}).", err=True)
-            click.echo("Add it with: textsessions add .", err=True)
-            sys.exit(1)
-        if best.path != cwd and (cwd / ".git").exists():
-            click.echo(f"Note: '{cwd.name}' is not configured — matched parent '{best.label}'. Run: textsessions add .", err=True)
-        repo = best
+        repo = _resolve_repo_from_cwd(config, add_hint="Add it with: textsessions add .")
 
     # Profile: explicit → validate; empty → repo default
     explicit_profile = bool(profile)
@@ -351,24 +356,7 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
         return
 
     if use_cwd:
-        cwd = Path.cwd()
-        best: RepoConfig | None = None
-        best_len = -1
-        for r in config.repos:
-            try:
-                cwd.relative_to(r.path)
-            except ValueError:
-                continue
-            parts = len(r.path.parts)
-            if parts > best_len:
-                best_len = parts
-                best = r
-        if best is None:
-            click.echo(f"No configured repo matches current directory ({cwd}).", err=True)
-            click.echo("Run: textsessions add .", err=True)
-            sys.exit(1)
-        if best.path != cwd and (cwd / ".git").exists():
-            click.echo(f"Note: '{cwd.name}' is not configured — matched parent '{best.label}'. Run: textsessions add .", err=True)
+        best = _resolve_repo_from_cwd(config)
         repo = best.label
         # Auto-reindex the matched repo so the list is always current
         from .config import detect_claude_dirs
