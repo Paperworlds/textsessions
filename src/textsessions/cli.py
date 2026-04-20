@@ -389,12 +389,14 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
         s = matched[0]
         cwd = s.repo_path
         if not cwd.exists():
-            cwd.mkdir(parents=True, exist_ok=True)
             click.echo(
-                f"Warning: repo path no longer exists — created empty dir: {cwd}\n"
-                f"  To fix permanently: textsessions repo move {s.repo_label} /new/path",
+                f"Error: repo path no longer exists: {cwd}\n"
+                f"  Session '{s.name}' belongs to repo '{s.repo_label}'.\n"
+                f"  If the folder moved, update it with:\n"
+                f"    textsessions repo move {s.repo_label} /new/path",
                 err=True,
             )
+            sys.exit(1)
         from .profiles import build_launch_env, resume_cmd
         env = build_launch_env(s.profile, {"textaccounts": config.integrations.textaccounts, "textproxy": config.integrations.textproxy})
         cmd = resume_cmd(s.id, s.name, s.profile, env, config.ui.claude_cmd)
@@ -1093,13 +1095,16 @@ def repo_group() -> None:
 @click.argument("label")
 @click.argument("new_path", type=click.Path())
 def repo_move(label: str, new_path: str) -> None:
-    """Update a repo's registered path (does not move files on disk).
+    """Update a repo's registered path after the folder has been moved.
 
-    Use this when you've moved or renamed a repo directory and need
-    textsessions to point to the new location.
+    Updates the config, renames Claude project directories to the new path key,
+    renames the session index, and reindexes so all session paths are correct.
 
     Example: textsessions repo move mcp-fleet ~/projects/mcp-fleet
     """
+    from .config import STATE_DIR, detect_claude_dirs
+    from .indexer import reindex_repos
+
     config = load()
     matches = [r for r in config.repos if r.label == label]
     if not matches:
@@ -1109,8 +1114,35 @@ def repo_move(label: str, new_path: str) -> None:
     if not dest.is_dir():
         raise click.UsageError(f"Directory not found: {dest}")
     old_path = repo.path
+    if old_path == dest:
+        click.echo("Path unchanged.")
+        return
+
+    old_key = repo_key(old_path)
+    new_key = repo_key(dest)
+
+    # 1. Rename Claude project directories across all claude config dirs
+    claude_dirs = detect_claude_dirs()
+    for claude_dir in claude_dirs:
+        old_proj = claude_dir / "projects" / old_key
+        new_proj = claude_dir / "projects" / new_key
+        if old_proj.exists() and not new_proj.exists():
+            old_proj.rename(new_proj)
+            click.echo(f"  Renamed {old_proj} → {new_proj}")
+        elif old_proj.exists() and new_proj.exists():
+            click.echo(f"  Warning: both {old_key} and {new_key} exist in {claude_dir}/projects — skipped rename")
+
+    # 2. Rename the session YAML index
+    old_yaml = STATE_DIR / f"{old_key}.yaml"
+    new_yaml = STATE_DIR / f"{new_key}.yaml"
+    if old_yaml.exists() and not new_yaml.exists():
+        old_yaml.rename(new_yaml)
+        click.echo(f"  Renamed index {old_yaml.name} → {new_yaml.name}")
+
+    # 3. Update config and reindex
     repo.path = dest
     save(config)
+    reindex_repos([dest], claude_dirs, all_repos=config.repos)
     click.echo(f"Updated '{label}': {old_path} → {dest}")
 
 

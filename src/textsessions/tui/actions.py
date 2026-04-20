@@ -267,8 +267,8 @@ class ActionsMixin:
         cmd = resume_cmd(resume_id, s.name, profile, env, self._config.ui.claude_cmd)
         cwd = s.repo_path
         if not cwd.exists():
-            cwd.mkdir(parents=True, exist_ok=True)
-            self.notify(f"Repo path missing — created empty dir: {cwd}", severity="warning")
+            self.notify(f"Repo path missing: {cwd} — use 'textsessions repo move' to fix", severity="error")
+            return
         with self.suspend():
             result = subprocess.run(cmd, env=env, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, cwd=cwd)
         if result.returncode != 0:
