@@ -387,6 +387,15 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
             click.echo(f"No session matching '{resume_name}'", err=True)
             sys.exit(1)
         s = matched[0]
+        if not s.repo_path.exists():
+            click.echo(
+                f"Error: repo path no longer exists: {s.repo_path}\n"
+                f"  Session '{s.name}' belongs to repo '{s.repo_label}'.\n"
+                f"  If the folder moved, update it with:\n"
+                f"    textsessions repo move {s.repo_label} /new/path",
+                err=True,
+            )
+            sys.exit(1)
         from .profiles import build_launch_env, resume_cmd
         env = build_launch_env(s.profile, {"textaccounts": config.integrations.textaccounts, "textproxy": config.integrations.textproxy})
         cmd = resume_cmd(s.id, s.name, s.profile, env, config.ui.claude_cmd)
@@ -1074,6 +1083,36 @@ def repos_cmd() -> None:
     for repo in config.repos:
         meta = f" profile={repo.profile}" if repo.profile else ""
         click.echo(f"REPO {repo.label} {repo.path}{meta}")
+
+
+@main.group("repo")
+def repo_group() -> None:
+    """Subcommands for managing configured repos."""
+
+
+@repo_group.command("move")
+@click.argument("label")
+@click.argument("new_path", type=click.Path())
+def repo_move(label: str, new_path: str) -> None:
+    """Update a repo's registered path (does not move files on disk).
+
+    Use this when you've moved or renamed a repo directory and need
+    textsessions to point to the new location.
+
+    Example: textsessions repo move mcp-fleet ~/projects/mcp-fleet
+    """
+    config = load()
+    matches = [r for r in config.repos if r.label == label]
+    if not matches:
+        raise click.UsageError(f"No repo with label '{label}'. Run 'textsessions repos' to list configured repos.")
+    repo = matches[0]
+    dest = Path(new_path).expanduser().resolve()
+    if not dest.is_dir():
+        raise click.UsageError(f"Directory not found: {dest}")
+    old_path = repo.path
+    repo.path = dest
+    save(config)
+    click.echo(f"Updated '{label}': {old_path} → {dest}")
 
 
 # ---------------------------------------------------------------------------
