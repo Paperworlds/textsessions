@@ -1,0 +1,5 @@
+follows:
+  - slug: textaccounts-api
+    pinned_version: "0.1.0"
+    implemented_in:
+      - src/textsessions/profiles.py
