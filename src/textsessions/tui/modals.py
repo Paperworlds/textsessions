@@ -288,14 +288,22 @@ class NewSessionModal(ModalScreen[NewSessionResult | None]):
         ("3 — low", "3"),
     ]
 
-    def __init__(self, profiles: list[str], default_profile: str, default_repo_path: str) -> None:
+    def __init__(
+        self,
+        profiles: list[str],
+        default_profile: str,
+        default_repo_path: str,
+        profile_descriptions: dict[str, str] | None = None,
+    ) -> None:
         super().__init__()
         self._profiles = profiles
         self._default_profile = default_profile
         self._default_repo_path = default_repo_path
+        self._profile_descriptions = profile_descriptions or {}
 
     def compose(self) -> ComposeResult:
         profile_options = [(p, p) for p in self._profiles]
+        default_desc = self._profile_descriptions.get(self._default_profile, "")
         with Vertical(id="dialog"):
             yield Label("[bold]New session[/bold]", id="title")
             yield Label("Name (optional):")
@@ -305,9 +313,16 @@ class NewSessionModal(ModalScreen[NewSessionResult | None]):
             yield Label("Profile:")
             yield Select(profile_options, id="profile-select", allow_blank=False,
                          value=self._default_profile)
+            yield Static(f"[dim]{default_desc}[/dim]" if default_desc else "", id="profile-desc")
             with Horizontal(id="buttons"):
                 yield Button("Launch", variant="primary", id="launch")
                 yield Button("Cancel", id="cancel")
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == "profile-select":
+            profile = str(event.value) if event.value and event.value is not Select.BLANK else ""
+            desc = self._profile_descriptions.get(profile, "")
+            self.query_one("#profile-desc", Static).update(f"[dim]{desc}[/dim]" if desc else "")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "launch":

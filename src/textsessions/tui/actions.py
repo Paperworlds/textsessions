@@ -21,7 +21,7 @@ from ..indexer import (
     _update_legacy_priority,
 )
 from ..config import detect_claude_dirs
-from ..profiles import build_launch_env, resume_cmd
+from ..profiles import build_launch_env, profile_description, resume_cmd
 from ..sessions import delete_session_from_index
 from .modals import (
     ArchiveModal,
@@ -322,8 +322,9 @@ class ActionsMixin:
                 self._apply_post_launch_metadata(result, launch_time, known_ids)
             self.run_worker(_post_launch(), exclusive=False)
 
+        descriptions = {p: profile_description(p) for p in profiles}
         self.push_screen(
-            NewSessionModal(profiles, default_profile, default_repo_path),
+            NewSessionModal(profiles, default_profile, default_repo_path, descriptions),
             handle,
         )
 

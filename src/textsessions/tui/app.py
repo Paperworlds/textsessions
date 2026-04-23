@@ -22,7 +22,7 @@ from textual.widgets import (
 )
 
 from ..config import Config, RepoConfig, load, repo_key
-from ..profiles import textaccounts_available
+from ..profiles import profile_description, textaccounts_available
 from ..indexer import (
     do_priority,
     find_session_created_after,
@@ -87,10 +87,15 @@ class SessionDetail(Static):
         detail_display = "\n           ".join(detail_lines)
         detail_label = "Desc:" if s.description else "Slug:"
 
+        profile_note = profile_description(s.profile) if s.profile else ""
+        profile_line = s.profile
+        if profile_note:
+            profile_line += f"  [dim]{profile_note}[/dim]"
+
         lines = [
             f"[bold]Name:[/bold]    [dim]{s.name}[/dim]",
             f"[bold]Repo:[/bold]    {s.repo_label}",
-            f"[bold]Profile:[/bold] {s.profile}",
+            f"[bold]Profile:[/bold] {profile_line}",
             f"[bold]Tags:[/bold]    {tags_str}",
             f"[bold]Priority:[/bold]{pri_str}",
             f"[bold]Active:[/bold]  {s.last_active}",

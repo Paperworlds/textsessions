@@ -25,6 +25,7 @@ try:
         available as textaccounts_available,
         env_for_profile as _ta_env_for_profile,
         list_profiles as list_textaccounts_profiles,
+        profile_description as _ta_profile_description,
     )
     _HAS_TEXTACCOUNTS = True
 except ImportError:
@@ -38,6 +39,17 @@ except ImportError:
 
     def _ta_env_for_profile(name: str) -> dict[str, str]:
         return {}
+
+    def _ta_profile_description(name: str) -> str:  # type: ignore[misc]
+        return ""
+
+
+def profile_description(name: str) -> str:
+    """Return the textaccounts description for a profile, or empty string."""
+    try:
+        return _ta_profile_description(name)
+    except Exception:
+        return ""
 
 
 # --- textproxy integration ---------------------------------------------------
