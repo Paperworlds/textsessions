@@ -254,11 +254,8 @@ def add(path: str, label: str, profile: str, recursive: bool) -> None:
     repo_path = Path(path).expanduser().resolve()
 
     if not profile:
-        try:
-            from textaccounts.api import active_profile
-            profile = active_profile() or "default"
-        except ImportError:
-            profile = "default"
+        from .profiles import active_profile
+        profile = active_profile() or "default"
 
     config = load()
     existing_paths = {r.path for r in config.repos}
@@ -1213,14 +1210,12 @@ def doctor_cmd() -> None:
 
     console.print()
     console.print("[bold]textaccounts[/bold]")
-    try:
-        from textaccounts.api import available as ta_available, env_for_profile, list_profiles
-        has_ta = True
-    except ImportError:
-        has_ta = False
-        ta_available = lambda: False  # noqa: E731
-        list_profiles = lambda: []  # noqa: E731
-        env_for_profile = lambda p: {}  # noqa: E731
+    from .profiles import (
+        _HAS_TEXTACCOUNTS as has_ta,
+        env_for_profile,
+        list_textaccounts_profiles as list_profiles,
+        textaccounts_available as ta_available,
+    )
 
     ta_enabled = config.integrations.textaccounts
     check("textaccounts importable", has_ta,

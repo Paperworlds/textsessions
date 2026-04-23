@@ -84,7 +84,7 @@ def test_build_launch_env_sets_claude_config_dir():
     with (
         patch("textsessions.profiles._HAS_TEXTACCOUNTS", True),
         patch("textsessions.profiles.textaccounts_available", return_value=True),
-        patch("textsessions.profiles._ta_env_for_profile", return_value={"CLAUDE_CONFIG_DIR": "/path/to/work"}),
+        patch("textsessions.profiles.env_for_profile", return_value={"CLAUDE_CONFIG_DIR": "/path/to/work"}),
         patch("textsessions.profiles.os.environ", CLEAN_ENV),
         patch("textsessions.profiles.textproxy_running", return_value=False),
     ):
@@ -122,7 +122,7 @@ def test_build_launch_env_unknown_profile_no_crash():
     with (
         patch("textsessions.profiles._HAS_TEXTACCOUNTS", True),
         patch("textsessions.profiles.textaccounts_available", return_value=True),
-        patch("textsessions.profiles._ta_env_for_profile", side_effect=ValueError("not found")),
+        patch("textsessions.profiles.env_for_profile", side_effect=ValueError("not found")),
         patch("textsessions.profiles.os.environ", CLEAN_ENV),
         patch("textsessions.profiles.textproxy_running", return_value=False),
     ):
@@ -136,7 +136,7 @@ def test_build_launch_env_default_profile_no_config_dir():
     with (
         patch("textsessions.profiles._HAS_TEXTACCOUNTS", True),
         patch("textsessions.profiles.textaccounts_available", return_value=True),
-        patch("textsessions.profiles._ta_env_for_profile", return_value={}),
+        patch("textsessions.profiles.env_for_profile", return_value={}),
         patch("textsessions.profiles.os.environ", CLEAN_ENV),
         patch("textsessions.profiles.textproxy_running", return_value=False),
     ):

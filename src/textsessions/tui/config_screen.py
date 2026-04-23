@@ -43,13 +43,10 @@ def _render_detail(repo: RepoConfig | None) -> str:
 
 
 def _available_profiles() -> list[str]:
-    try:
-        from textaccounts.api import list_profiles
-        profiles = list_profiles()
-        if profiles:
-            return profiles
-    except ImportError:
-        pass
+    from textsessions.profiles import list_textaccounts_profiles
+    profiles = list_textaccounts_profiles()
+    if profiles:
+        return profiles
     return ["default"]
 
 

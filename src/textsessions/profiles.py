@@ -20,12 +20,14 @@ import socket
 # All textaccounts knowledge is delegated to its public API. textsessions never
 # reads ~/.textaccounts/ directly — that's textaccounts' business.
 
+# SPEC: textaccounts-api
 try:
     from textaccounts.api import (
-        available as textaccounts_available,
-        env_for_profile as _ta_env_for_profile,
-        list_profiles as list_textaccounts_profiles,
-        profile_description as _ta_profile_description,
+        active_profile as _ta_active_profile,         # SPEC: textaccounts-api
+        available as textaccounts_available,           # SPEC: textaccounts-api
+        env_for_profile,                               # SPEC: textaccounts-api
+        list_profiles as list_textaccounts_profiles,  # SPEC: textaccounts-api
+        profile_description as _ta_profile_description,  # SPEC: textaccounts-api
     )
     _HAS_TEXTACCOUNTS = True
 except ImportError:
@@ -37,17 +39,28 @@ except ImportError:
     def list_textaccounts_profiles() -> list[str]:  # type: ignore[misc]
         return []
 
-    def _ta_env_for_profile(name: str) -> dict[str, str]:
+    def env_for_profile(name: str) -> dict[str, str]:  # type: ignore[misc]
         return {}
 
     def _ta_profile_description(name: str) -> str:  # type: ignore[misc]
         return ""
 
+    def _ta_active_profile() -> str | None:  # type: ignore[misc]
+        return None
+
+
+def active_profile() -> str | None:
+    """Return the name of the currently active textaccounts profile, or None."""
+    try:
+        return _ta_active_profile()  # SPEC: textaccounts-api
+    except Exception:
+        return None
+
 
 def profile_description(name: str) -> str:
     """Return the textaccounts description for a profile, or empty string."""
     try:
-        return _ta_profile_description(name)
+        return _ta_profile_description(name)  # SPEC: textaccounts-api
     except Exception:
         return ""
 
@@ -93,11 +106,11 @@ def validate_explicit_profile(name: str) -> None:
             f"Profile '{name}' requested but textaccounts is not installed.\n"
             "Install it (uv tool install textaccounts) or remove --profile."
         )
-    if not textaccounts_available():
+    if not textaccounts_available():  # SPEC: textaccounts-api
         raise click.UsageError(
             "textaccounts is installed but not configured. Run: textaccounts init"
         )
-    known = list_textaccounts_profiles()
+    known = list_textaccounts_profiles()  # SPEC: textaccounts-api
     if name not in known:
         available = ", ".join(known) if known else "(none)"
         raise click.UsageError(
@@ -147,9 +160,9 @@ def build_launch_env(profile: str, integrations_enabled: dict[str, bool]) -> dic
     env = os.environ.copy()
 
     if integrations_enabled.get("textaccounts", True) and _HAS_TEXTACCOUNTS:
-        if textaccounts_available():
+        if textaccounts_available():  # SPEC: textaccounts-api
             try:
-                profile_env = _ta_env_for_profile(profile)
+                profile_env = env_for_profile(profile)  # SPEC: textaccounts-api
                 env.update(profile_env)
             except ValueError:
                 pass  # profile not found in textaccounts — fall through to tier 2/3
