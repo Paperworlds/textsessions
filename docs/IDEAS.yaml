@@ -1,0 +1,20 @@
+ideas:
+  - id: auto-tag-sessions
+    title: ts auto-tag — bulk-tag existing sessions via cached dummy agents
+    status: idea
+    priority: 2
+    summary: |
+      Auto-tag existing sessions in a repo by piping each session's
+      name+slug+description to a small Claude worker (`claude -p` on haiku in
+      terse/bare mode) and parsing tag suggestions back.
+
+      **Approach:**
+      - Mirror `search_cmd` in `cli.py` (same fish subprocess pattern).
+      - Small model (haiku) + terse mode to keep per-session cost minimal.
+      - Cache results by session_id → tags; re-runs skip already-tagged sessions.
+      - `--dry-run` default, `--apply` to commit via `mutate_index`.
+      - Seed vocabulary from existing top tags in the repo so the model
+        reinforces the user's own axes rather than inventing new ones.
+
+      **Why:** Sessions have slugs and descriptions but almost no tags.
+      Manual tagging at scale is tedious. Cached LLM runs make re-runs cheap.
