@@ -269,7 +269,7 @@ def test_reindex_repos_excludes_child_repo_sessions(tmp_path):
 
     parent_path = tmp_path / "projects" / "personal"
     parent_path.mkdir(parents=True)
-    child_path = parent_path / "paperworlds" / "paperagents"
+    child_path = parent_path / "paperworlds" / "textprompts"
     child_path.mkdir(parents=True)
 
     parent_rk = str(parent_path).replace("/", "-")
@@ -298,7 +298,7 @@ def test_reindex_repos_excludes_child_repo_sessions(tmp_path):
             self.profile = profile
 
     parent_repo = FakeRepo(path=parent_path, label="personal", profile="personal")
-    child_repo = FakeRepo(path=child_path, label="paperagents", profile="personal")
+    child_repo = FakeRepo(path=child_path, label="textprompts", profile="personal")
 
     state_dir = tmp_path / "state"
     with patch("textsessions.indexer.STATE_DIR", state_dir), \
