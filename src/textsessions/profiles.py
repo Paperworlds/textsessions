@@ -140,9 +140,9 @@ def resume_cmd(session_id: str, session_name: str, profile: str, env: dict[str, 
     claude_cmd = f"{base_cmd} --resume {shlex.quote(session_id)}"
 
     if os.environ.get("TMUX"):
-        base_label = session_name or session_id[:8]
-        prefix = f"{profile[0]}-" if profile else ""
-        window_name = shlex.quote(f"{prefix}{base_label}")
+        base_label = (session_name or session_id)[:8]
+        suffix = f"-{profile[0]}" if profile else ""
+        window_name = shlex.quote(f"{base_label}{suffix}")
         fish_cmd = f"tmux rename-window {window_name}; set -lx CLAUDE_RESUME_NAME {window_name}; {claude_cmd}"
     else:
         fish_cmd = claude_cmd
