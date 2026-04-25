@@ -1171,6 +1171,33 @@ def repo_move(label: str, new_path: str) -> None:
     console.print(f"[green]Done[/green]  '{label}': {old_path} → {dest}")
 
 
+@repo_group.command("rename")
+@click.argument("old_label")
+@click.argument("new_label")
+def repo_rename(old_label: str, new_label: str) -> None:
+    """Rename a repo's label without changing its path.
+
+    For path changes, use 'textsessions repo move'.
+
+    Example: textsessions repo rename paperagents textprompts
+    """
+    config = load()
+    matches = [r for r in config.repos if r.label == old_label]
+    if not matches:
+        raise click.UsageError(
+            f"No repo with label '{old_label}'. Run 'textsessions repos' to list configured repos."
+        )
+    if old_label == new_label:
+        click.echo("Label unchanged.")
+        return
+    if any(r.label == new_label for r in config.repos):
+        raise click.UsageError(f"Label '{new_label}' already exists.")
+
+    matches[0].label = new_label
+    save(config)
+    click.echo(f"Done  '{old_label}' → '{new_label}'")
+
+
 # ---------------------------------------------------------------------------
 # Doctor command
 # ---------------------------------------------------------------------------
