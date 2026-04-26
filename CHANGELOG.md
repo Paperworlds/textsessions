@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.8.8
+
+- `feat(repo)`: add `ts repo rename` for label-only changes (no filesystem move)
+- feat: truncate tmux window name to 8 chars; profile moved to suffix
+- feat: show textaccounts profile description in session detail and new-session views
+- `conform`: route all `textaccounts.api` imports through `profiles.py`
+- docs: declare conformance to textaccounts-api spec v0.1.0
+- docs: add `IDEAS.yaml` with auto-tag-sessions idea
+- chore: lower `requires-python` to `>=3.13`
+- chore: rename `paperagents` → `textprompts` in test fixture (follows textprompts v0.9.6)
+
+## v0.8.7
+
+- refactor: `rename_cmd` and `tag_cmd` use `mutate_index`
+- refactor: split `scan_ghosts` into private subfunctions
+- refactor: extract `_resolve_repo_from_cwd` helper + regression tests
+- feat: graceful error + repo move when repo path missing
+- feat: add `textsessions repos` CLI contract
+- fix: pass `RepoConfig` object (not `Path`) to `reindex_repos` in repo move
+- fix: repo move migrates Claude project dirs and session index to new location
+- fix: repo move shows per-step status and catches errors instead of crashing
+- fix: `mkdir` missing repo path on resume so Claude finds session by project
+- fix: fall back to `$HOME` cwd when repo path missing; allow resume
+- fix: set `ANTHROPIC_BASE_URL` in fish command to survive `config.fish` overrides
+- fix: prevent `DuplicateKey` crash when parent+child repos overlap
+- fix: commit missing `conftest.py` and `test_config.py` (CI was failing)
+- chore: pin CI to Python 3.14 to match `requires-python >= 3.14` (later relaxed to `>=3.13` in v0.8.8)
+
 ## v0.8.6
 
 - Fix: DuplicateKey crash when a parent repo and a child repo both index the same session ID
