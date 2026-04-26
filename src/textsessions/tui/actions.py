@@ -264,7 +264,7 @@ class ActionsMixin:
             "textaccounts": self._config.integrations.textaccounts,
             "textproxy": self._config.integrations.textproxy,
         })
-        cmd = resume_cmd(resume_id, s.name, profile, env, self._config.ui.claude_cmd)
+        cmd = resume_cmd(resume_id, s.name, profile, env)
         cwd = s.repo_path
         if not cwd.exists():
             self.notify(f"Repo path missing: {cwd} — use 'textsessions repo move' to fix", severity="error")
@@ -301,11 +301,7 @@ class ActionsMixin:
                 "textaccounts": self._config.integrations.textaccounts,
                 "textproxy": self._config.integrations.textproxy,
             })
-            if "CLAUDE_CONFIG_DIR" in env:
-                base_cmd = "claude"
-            else:
-                base_cmd = self._config.ui.claude_cmd.format(profile=result.profile or "default")
-            fish_parts = [base_cmd]
+            fish_parts = ["claude"]
             if result.name:
                 fish_parts += ["--name", shlex.quote(result.name)]
             cmd = ["fish", "-c", " ".join(fish_parts)]

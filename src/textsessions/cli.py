@@ -164,11 +164,7 @@ def new_cmd(repo_label: str, profile: str, name: str, priority: str | None, mode
         "textaccounts": config.integrations.textaccounts,
         "textproxy": config.integrations.textproxy,
     })
-    if "CLAUDE_CONFIG_DIR" in env:
-        base_cmd = "claude"
-    else:
-        base_cmd = config.ui.claude_cmd.format(profile=profile or "default")
-    fish_parts = [base_cmd]
+    fish_parts = ["claude"]
     if name:
         fish_parts += ["--name", shlex.quote(name)]
     if model:
@@ -384,7 +380,7 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
             sys.exit(1)
         from .profiles import build_launch_env, resume_cmd
         env = build_launch_env(s.profile, {"textaccounts": config.integrations.textaccounts, "textproxy": config.integrations.textproxy})
-        cmd = resume_cmd(s.id, s.name, s.profile, env, config.ui.claude_cmd)
+        cmd = resume_cmd(s.id, s.name, s.profile, env)
         sys.exit(subprocess.run(cmd, env=env, cwd=cwd).returncode)
 
     filtered = filter_sessions(all_sessions, query=query, tag=tag, profile=profile, repo_label=repo)
@@ -931,17 +927,22 @@ def index_auto_rename(repo_key_arg: str | None, dry_run: bool) -> None:
 
 @main.command("search")
 @click.argument("query")
-@click.option("--profile", "ai_profile", default="", metavar="CMD", help="Override AI command/profile from config")
+@click.option("--profile", "-p", default="", shell_complete=_complete_profiles,
+              metavar="NAME", help="textaccounts profile to use (default: active profile).")
 @click.option("--repo", "repo_label", default="", metavar="LABEL", help="Limit search to a repo")
 @click.option("--limit", default=10, show_default=True, metavar="N", help="Max results")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
-def search_cmd(query: str, ai_profile: str, repo_label: str, limit: int, as_json: bool) -> None:
+def search_cmd(query: str, profile: str, repo_label: str, limit: int, as_json: bool) -> None:
     """Search past sessions using natural language (powered by Claude).
 
-    Sends session metadata to Claude and asks it to find relevant sessions.
-    The Claude command used is configured via ui.ai_search_profile (default: claude-personal).
+    Sends session metadata to `claude -p` and asks it to find relevant sessions.
+    Profile selection is the same as `ts new --profile`.
     """
+    from .profiles import build_launch_env, validate_explicit_profile
+
     config = load()
+    if profile:
+        validate_explicit_profile(profile)
 
     all_sessions = load_sessions(config)
     if repo_label:
@@ -972,18 +973,20 @@ def search_cmd(query: str, ai_profile: str, repo_label: str, limit: int, as_json
         f'If nothing matches, return {{"matches": [], "reason": "no relevant sessions found"}}.'
     )
 
-    # ai_search_profile is a fish function/command — must run via fish -c so fish functions resolve
-    ai_cmd = ai_profile or config.ui.ai_search_profile
-    cmd = ["fish", "-c", f"{ai_cmd} -p"]
+    env = build_launch_env(profile, {
+        "textaccounts": config.integrations.textaccounts,
+        "textproxy": config.integrations.textproxy,
+    })
+    cmd = ["claude", "-p"]
 
     console = Console()
     if capped:
         console.print(f"[dim]  (searching {MAX_SESSIONS} of {len(all_sessions)} sessions)[/dim]", highlight=False)
 
     try:
-        result = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=60)
+        result = subprocess.run(cmd, input=prompt, env=env, capture_output=True, text=True, timeout=60)
     except FileNotFoundError:
-        click.echo("fish not found — required to resolve fish functions.", err=True)
+        click.echo("claude not found on PATH.", err=True)
         sys.exit(1)
     except subprocess.TimeoutExpired:
         click.echo("Search timed out.", err=True)
@@ -1280,11 +1283,8 @@ def doctor_cmd() -> None:
             )
     else:
         for profile in sorted(profiles_in_use):
-            tpl = config.ui.claude_cmd
-            cmd = tpl.format(profile=profile) if "{profile}" in tpl else tpl
-            on_path = bool(shutil.which(cmd))
-            check(f"profile '{profile}' → '{cmd}' on PATH", on_path,
-                  fix=f"Define a fish function named '{cmd}' or install textaccounts")
+            check(f"profile '{profile}' has no resolver", False,
+                  fix="Install textaccounts (uv tool install textaccounts) — only path for profile switching")
 
     console.print()
     console.print("[bold]Session indexes[/bold]")

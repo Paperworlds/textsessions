@@ -1,11 +1,10 @@
 """Profile and integration detection helpers for textsessions.
 
-Three tiers for profile resolution:
-  1. textaccounts installed → delegates to textaccounts.api (auto-discovers profiles,
-     sets CLAUDE_CONFIG_DIR). Zero config.
-  2. No textaccounts, custom commands → user sets claude_cmd = "claude-{profile}" in
-     config.toml. Each repo's profile name is substituted into the template.
-  3. Single account → plain "claude", no profile switching.
+Profile resolution:
+  - textaccounts installed + configured → CLAUDE_CONFIG_DIR is injected into
+    the env via textaccounts.api.env_for_profile. The launched `claude`
+    process picks up the right profile config.
+  - Otherwise → plain `claude` with no profile switching (single account).
 
 Never auto-installs anything — only detects and guides.
 """
@@ -120,24 +119,16 @@ def validate_explicit_profile(name: str) -> None:
 
 # --- launch helpers ----------------------------------------------------------
 
-def resume_cmd(session_id: str, session_name: str, profile: str, env: dict[str, str], claude_cmd_tpl: str = "claude") -> list[str]:
+def resume_cmd(session_id: str, session_name: str, profile: str, env: dict[str, str]) -> list[str]:
     """Return the argv list to resume a Claude session.
 
-    Handles tmux window rename and profile-based claude command selection.
-    Always returns a fish command so that fish functions are available.
-
-    Tier 1 (textaccounts): CLAUDE_CONFIG_DIR is in env → use plain "claude".
-    Tier 2 (custom commands): claude_cmd_tpl has {profile} → expands to e.g. "claude-work".
-    Tier 3 (single account): claude_cmd_tpl is "claude" → uses "claude".
+    Profile selection happens via `env` (textaccounts injects CLAUDE_CONFIG_DIR);
+    this function always invokes plain `claude`. Wrapped in `fish -c` so the
+    optional tmux window rename runs in the same shell.
     """
     import shlex
 
-    if "CLAUDE_CONFIG_DIR" in env:
-        base_cmd = "claude"
-    else:
-        base_cmd = claude_cmd_tpl.format(profile=profile or "default")
-
-    claude_cmd = f"{base_cmd} --resume {shlex.quote(session_id)}"
+    claude_cmd = f"claude --resume {shlex.quote(session_id)}"
 
     if os.environ.get("TMUX"):
         base_label = (session_name or session_id)[:8]
