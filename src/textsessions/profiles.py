@@ -19,14 +19,14 @@ import socket
 # All textaccounts knowledge is delegated to its public API. textsessions never
 # reads ~/.textaccounts/ directly — that's textaccounts' business.
 
-# SPEC: textaccounts-api
+# SPEC: textaccounts-api-v0-2
 try:
     from textaccounts.api import (
-        active_profile as _ta_active_profile,         # SPEC: textaccounts-api
-        available as textaccounts_available,           # SPEC: textaccounts-api
-        env_for_profile,                               # SPEC: textaccounts-api
-        list_profiles as list_textaccounts_profiles,  # SPEC: textaccounts-api
-        profile_description as _ta_profile_description,  # SPEC: textaccounts-api
+        active_profile as _ta_active_profile,         # SPEC: textaccounts-api-v0-2
+        available as textaccounts_available,           # SPEC: textaccounts-api-v0-2
+        env_for_profile,                               # SPEC: textaccounts-api-v0-2
+        list_profiles as list_textaccounts_profiles,  # SPEC: textaccounts-api-v0-2
+        profile_description as _ta_profile_description,  # SPEC: textaccounts-api-v0-2
     )
     _HAS_TEXTACCOUNTS = True
 except ImportError:
@@ -51,7 +51,7 @@ except ImportError:
 def active_profile() -> str | None:
     """Return the name of the currently active textaccounts profile, or None."""
     try:
-        return _ta_active_profile()  # SPEC: textaccounts-api
+        return _ta_active_profile()  # SPEC: textaccounts-api-v0-2
     except Exception:
         return None
 
@@ -59,7 +59,7 @@ def active_profile() -> str | None:
 def profile_description(name: str) -> str:
     """Return the textaccounts description for a profile, or empty string."""
     try:
-        return _ta_profile_description(name)  # SPEC: textaccounts-api
+        return _ta_profile_description(name)  # SPEC: textaccounts-api-v0-2
     except Exception:
         return ""
 
@@ -105,11 +105,11 @@ def validate_explicit_profile(name: str) -> None:
             f"Profile '{name}' requested but textaccounts is not installed.\n"
             "Install it (uv tool install textaccounts) or remove --profile."
         )
-    if not textaccounts_available():  # SPEC: textaccounts-api
+    if not textaccounts_available():  # SPEC: textaccounts-api-v0-2
         raise click.UsageError(
             "textaccounts is installed but not configured. Run: textaccounts init"
         )
-    known = list_textaccounts_profiles()  # SPEC: textaccounts-api
+    known = list_textaccounts_profiles()  # SPEC: textaccounts-api-v0-2
     if name not in known:
         available = ", ".join(known) if known else "(none)"
         raise click.UsageError(
@@ -144,16 +144,16 @@ def resume_cmd(session_id: str, session_name: str, profile: str, env: dict[str, 
 def build_launch_env(profile: str, integrations_enabled: dict[str, bool]) -> dict[str, str]:
     """Build subprocess env dict with integrations applied.
 
-    Tier 1: textaccounts installed + enabled → delegates to textaccounts.api.env_for_profile()
-            to get the right env vars (currently CLAUDE_CONFIG_DIR).
-    Tier 2/3: no textaccounts → env is unchanged, resume_cmd handles command selection.
+    textaccounts (when installed and enabled) injects CLAUDE_CONFIG_DIR via
+    env_for_profile; otherwise env is unchanged and `claude` runs against the
+    user's default config.
     """
     env = os.environ.copy()
 
     if integrations_enabled.get("textaccounts", True) and _HAS_TEXTACCOUNTS:
-        if textaccounts_available():  # SPEC: textaccounts-api
+        if textaccounts_available():  # SPEC: textaccounts-api-v0-2
             try:
-                profile_env = env_for_profile(profile)  # SPEC: textaccounts-api
+                profile_env = env_for_profile(profile)  # SPEC: textaccounts-api-v0-2
                 env.update(profile_env)
             except ValueError:
                 pass  # profile not found in textaccounts — fall through to tier 2/3

@@ -1,5 +1,5 @@
 follows:
-  - slug: textaccounts-api
-    pinned_version: "0.1.0"
+  - slug: textaccounts-api-v0-2
+    pinned_version: "0.2.0"
     implemented_in:
       - src/textsessions/profiles.py
