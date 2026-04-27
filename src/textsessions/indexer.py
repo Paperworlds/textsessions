@@ -232,9 +232,20 @@ def _migrate_legacy_priorities(repo_key: str, index: dict) -> None:
 
 def build_index(repo_key: str, pairs: list[str]) -> dict:
     """Rebuild YAML index from .jsonl files, preserving user-set fields."""
+    from .profiles import get_profile_lineage
+
     old_index = load_index(repo_key)
     sessions = scan_sessions(pairs)
     new_index: dict = {}
+    lineage_cache: dict[str, dict | None] = {}
+
+    def _lineage_for(profile_name: str) -> dict | None:
+        """Cached lookup. Returns lineage dict from the spec API, or None."""
+        if profile_name in lineage_cache:
+            return lineage_cache[profile_name]
+        result = get_profile_lineage(profile_name)
+        lineage_cache[profile_name] = result
+        return result
 
     for s in sessions:
         sid = s["id"]
@@ -275,6 +286,20 @@ def build_index(repo_key: str, pairs: list[str]) -> dict:
             for field in ("name", "description"):
                 if old.get(field):
                     entry[field] = old[field]
+
+        # Shallow-clone lineage: store only when the profile is a shallow clone.
+        # If textaccounts no longer has the profile (GCd), preserve the last
+        # known lineage from the old index — surfaces stale shallow sessions
+        # rather than silently dropping their lineage chip.
+        lineage = _lineage_for(prof)
+        if lineage and lineage.get("shallow"):
+            entry["lineage"] = {
+                "parent": lineage.get("parent") or "",
+                "ephemeral": bool(lineage.get("ephemeral", False)),
+                "owner": lineage.get("owner") or "",
+            }
+        elif old.get("lineage"):
+            entry["lineage"] = old["lineage"]
 
         new_index[sid] = entry
 

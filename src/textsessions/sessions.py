@@ -20,6 +20,33 @@ PRIORITY_ORDER = {"H0": 0, "1": 1, "2": 2, "3": 3, "": 9}
 
 
 @dataclass
+class Lineage:
+    """Shallow-clone lineage captured at index time. Surfaced from textaccounts.
+
+    Sessions launched against a non-shallow profile have lineage=None.
+    """
+    parent: str = ""
+    ephemeral: bool = False
+    owner: str = ""
+
+    def to_dict(self) -> dict:
+        out: dict = {"parent": self.parent, "ephemeral": self.ephemeral}
+        if self.owner:
+            out["owner"] = self.owner
+        return out
+
+    @classmethod
+    def from_dict(cls, d: dict | None) -> "Lineage | None":
+        if not d:
+            return None
+        return cls(
+            parent=d.get("parent", "") or "",
+            ephemeral=bool(d.get("ephemeral", False)),
+            owner=d.get("owner", "") or "",
+        )
+
+
+@dataclass
 class Session:
     id: str
     name: str
@@ -32,6 +59,25 @@ class Session:
     repo_path: Path = field(default_factory=Path)
     pinned: bool = False
     description: str = ""
+    lineage: Lineage | None = None
+
+    @classmethod
+    def from_index_entry(cls, sid: str, entry: dict, repo_label: str, repo_path: Path) -> "Session":
+        """Build a Session from a YAML index entry."""
+        return cls(
+            id=sid,
+            name=entry.get("name", sid[:8]),
+            profile=entry.get("profile", ""),
+            last_active=entry.get("last_active", ""),
+            slug=entry.get("slug", ""),
+            tags=entry.get("tags", []),
+            priority=str(entry.get("priority", "") or ""),
+            repo_label=repo_label,
+            repo_path=repo_path,
+            pinned=bool(entry.get("pinned", False)),
+            description=entry.get("description", ""),
+            lineage=Lineage.from_dict(entry.get("lineage")),
+        )
 
     @property
     def priority_order(self) -> int:
@@ -74,6 +120,29 @@ class Session:
         """Session created by an automated runner (pp worker, CI, etc.)."""
         return "worker" in self.tags or "automated" in self.tags
 
+    @property
+    def is_shallow(self) -> bool:
+        """Session was launched against a shallow-clone profile."""
+        return self.lineage is not None
+
+    @property
+    def lineage_chip(self) -> str:
+        """Short display string for shallow lineage. Empty for non-shallow sessions.
+
+        Examples:
+          [shallow ← personal]
+          [shallow ← work, ephemeral, owner=textprompts:run-42]
+        """
+        if not self.lineage:
+            return ""
+        parts = [f"shallow ← {self.lineage.parent or '?'}"]
+        if self.lineage.ephemeral:
+            ep = "ephemeral"
+            if self.lineage.owner:
+                ep += f", owner={self.lineage.owner}"
+            parts.append(ep)
+        return f"[{', '.join(parts)}]"
+
 
 def _load_yaml_index(yaml_path: Path) -> dict:
     if not yaml_path.exists():
@@ -84,22 +153,7 @@ def _load_yaml_index(yaml_path: Path) -> dict:
 
 def _sessions_from_index(yaml_path: Path, repo_label: str, repo_path: Path) -> list[Session]:
     index = _load_yaml_index(yaml_path)
-    sessions = []
-    for sid, entry in index.items():
-        sessions.append(Session(
-            id=sid,
-            name=entry.get("name", sid[:8]),
-            profile=entry.get("profile", ""),
-            last_active=entry.get("last_active", ""),
-            slug=entry.get("slug", ""),
-            tags=entry.get("tags", []),
-            priority=str(entry.get("priority", "") or ""),
-            repo_label=repo_label,
-            repo_path=repo_path,
-            pinned=bool(entry.get("pinned", False)),
-            description=entry.get("description", ""),
-        ))
-    return sessions
+    return [Session.from_index_entry(sid, entry, repo_label, repo_path) for sid, entry in index.items()]
 
 
 def _expand_recursive(repo: RepoConfig) -> list[RepoConfig]:
@@ -226,6 +280,10 @@ def filter_sessions(
     show_archived: bool = False,
     show_automated: bool = False,
     ghosts_only: bool = False,
+    shallow_only: bool = False,
+    no_shallow: bool = False,
+    parent: str = "",
+    owner: str = "",
 ) -> list[Session]:
     result = sessions
     if not show_archived:
@@ -254,6 +312,14 @@ def filter_sessions(
         result = [s for s in result if s.profile == profile]
     if repo_label:
         result = [s for s in result if s.repo_label == repo_label or s.repo_label.startswith(repo_label + "/")]
+    if shallow_only:
+        result = [s for s in result if s.is_shallow]
+    if no_shallow:
+        result = [s for s in result if not s.is_shallow]
+    if parent:
+        result = [s for s in result if s.lineage and s.lineage.parent == parent]
+    if owner:
+        result = [s for s in result if s.lineage and s.lineage.owner == owner]
     return result
 
 

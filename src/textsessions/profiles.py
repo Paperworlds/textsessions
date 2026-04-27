@@ -25,6 +25,7 @@ try:
         active_profile as _ta_active_profile,         # SPEC: textaccounts-api-v0-2
         available as textaccounts_available,           # SPEC: textaccounts-api-v0-2
         env_for_profile,                               # SPEC: textaccounts-api-v0-2
+        get_profile_lineage as _ta_get_profile_lineage,  # SPEC: textaccounts-api-v0-2
         list_profiles as list_textaccounts_profiles,  # SPEC: textaccounts-api-v0-2
         profile_description as _ta_profile_description,  # SPEC: textaccounts-api-v0-2
     )
@@ -47,6 +48,9 @@ except ImportError:
     def _ta_active_profile() -> str | None:  # type: ignore[misc]
         return None
 
+    def _ta_get_profile_lineage(name: str) -> dict | None:  # type: ignore[misc]
+        return None
+
 
 def active_profile() -> str | None:
     """Return the name of the currently active textaccounts profile, or None."""
@@ -62,6 +66,20 @@ def profile_description(name: str) -> str:
         return _ta_profile_description(name)  # SPEC: textaccounts-api-v0-2
     except Exception:
         return ""
+
+
+def get_profile_lineage(name: str) -> dict | None:
+    """Return shallow-clone lineage for a profile, or None if unknown.
+
+    Keys: shallow (bool), parent (str | None), ephemeral (bool), owner (str).
+    Wraps the textaccounts.api function so callers can stay inside textsessions.profiles.
+    """
+    if not name:
+        return None
+    try:
+        return _ta_get_profile_lineage(name)  # SPEC: textaccounts-api-v0-2
+    except Exception:
+        return None
 
 
 # --- textproxy integration ---------------------------------------------------

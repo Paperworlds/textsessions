@@ -335,13 +335,19 @@ def _complete_session_names(ctx: click.Context, param: click.Parameter, incomple
 @click.option("--current-folder", "use_cwd", is_flag=True, help="Filter to the repo matching the current directory")
 @click.option("--priority", "by_priority", is_flag=True, help="Sort by priority")
 @click.option("--limit", "-l", default=20, show_default=True, help="Max sessions to show")
+@click.option("--shallow-only", is_flag=True, help="Only sessions launched against shallow-clone profiles")
+@click.option("--no-shallow", is_flag=True, help="Hide shallow-clone sessions")
+@click.option("--parent", default="", metavar="PROFILE", help="Only shallow sessions cloned from PROFILE")
+@click.option("--owner", default="", metavar="ID", help="Only shallow sessions with this owner")
 @click.option("--resume", "resume_name", default="", metavar="NAME",
               shell_complete=_complete_session_names,
               help="Resume a session by name or ID prefix.")
 @click.option("--names-only", "names_only", is_flag=True, hidden=True,
               help="Print session names one per line (for shell completion).")
 @click.option("--reindex", is_flag=True, help="Rebuild indexes from .jsonl before listing")
-def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, by_priority: bool, limit: int, resume_name: str, names_only: bool, reindex: bool) -> None:
+def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, by_priority: bool, limit: int,
+                 shallow_only: bool, no_shallow: bool, parent: str, owner: str,
+                 resume_name: str, names_only: bool, reindex: bool) -> None:
     """Print session table (non-TUI, for scripting)."""
     config = load()
     if not config.repos:
@@ -383,7 +389,8 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
         cmd = resume_cmd(s.id, s.name, s.profile, env)
         sys.exit(subprocess.run(cmd, env=env, cwd=cwd).returncode)
 
-    filtered = filter_sessions(all_sessions, query=query, tag=tag, profile=profile, repo_label=repo)
+    filtered = filter_sessions(all_sessions, query=query, tag=tag, profile=profile, repo_label=repo,
+                               shallow_only=shallow_only, no_shallow=no_shallow, parent=parent, owner=owner)
     if by_priority:
         filtered = sort_by_priority(filtered)
     filtered = filtered[:limit]
@@ -392,6 +399,8 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
         for s in filtered:
             click.echo(s.name)
         return
+
+    show_lineage_col = any(s.is_shallow for s in filtered)
 
     console = Console()
     table = Table(show_header=True, header_style="bold")
@@ -402,13 +411,19 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
     table.add_column("Profile")
     table.add_column("Tags")
     table.add_column("Pri")
+    if show_lineage_col:
+        table.add_column("Lineage", style="cyan")
     table.add_column("Last Active")
 
     for s in filtered:
         tags_str = " ".join(f"#{t}" for t in s.tags)
         pri = s.display_priority
         info = s.description or s.slug
-        table.add_row(s.name, s.id[:8], info, s.repo_label, s.profile, tags_str, pri, s.last_active)
+        row = [s.name, s.id[:8], info, s.repo_label, s.profile, tags_str, pri]
+        if show_lineage_col:
+            row.append(s.lineage_chip)
+        row.append(s.last_active)
+        table.add_row(*row)
 
     console.print(table)
 

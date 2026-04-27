@@ -100,6 +100,10 @@ class SessionDetail(Static):
             f"[bold]Priority:[/bold]{pri_str}",
             f"[bold]Active:[/bold]  {s.last_active}",
             f"[bold]ID:[/bold]      [dim]{s.id}[/dim]",
+        ]
+        if s.is_shallow:
+            lines.append(f"[bold]Lineage:[/bold] [cyan]{s.lineage_chip}[/cyan]")
+        lines += [
             "",
             f"[bold]{detail_label}[/bold]    [dim]{detail_display}[/dim]",
             "",
@@ -298,7 +302,8 @@ class TextSessionsApp(ActionsMixin, App):
                 name_cell = label
             tags = [t for t in s.tags if t != "archived"]
             tags_str = "  " + " ".join(f"[cyan]#{t}[/cyan]" for t in tags) if tags else ""
-            profile_cell = f"{s.profile}{tags_str}"
+            shallow_str = f" [cyan]{s.lineage_chip}[/cyan]" if s.is_shallow else ""
+            profile_cell = f"{s.profile}{tags_str}{shallow_str}"
             row = [name_cell]
             if not single_repo:
                 row.append(s.repo_label[:15])
