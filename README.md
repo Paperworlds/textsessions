@@ -125,9 +125,17 @@ textsessions sessions --resume my-feature-work
 
 # Filter to current folder's repo
 textsessions sessions --current-folder
+
+# Shallow-clone lineage filters (require textaccounts)
+textsessions sessions --shallow-only            # only sessions on shallow profiles
+textsessions sessions --no-shallow              # hide them
+textsessions sessions --parent personal         # shallow profiles cloned from `personal`
+textsessions sessions --owner pp:run-7          # match an exact lineage owner id
 ```
 
 The table shows: **Name**, **Info** (description if set, otherwise the auto-generated slug), Repo, Profile, Tags, Priority, Last Active.
+
+When any visible session runs on a shallow-clone profile, a **Lineage** column appears with chips like `[shallow ← personal, ephemeral, owner=pp:run-7]`. The chip is also rendered in the TUI row and detail panel.
 
 ### Rename and tag
 
@@ -150,9 +158,22 @@ textsessions tag my-feature-work api,-old,keep
 ```sh
 textsessions search "add client to privatelink"
 textsessions search "auth refactor" --repo mono --limit 5 --json
+textsessions search "auth refactor" --profile work    # use a textaccounts profile for the search
 ```
 
-Sends session metadata to Claude and returns ranked matches. Requires a Claude command to be configured as `ui.ai_search_profile` (default: `claude`).
+Sends session metadata to Claude and returns ranked matches. With `--profile`, the underlying `claude -p` call runs under that textaccounts profile (validated up front).
+
+### Shallow profiles
+
+`ts shallow new` creates a [shallow-clone](https://github.com/paperworlds/textaccounts/blob/main/docs/specs/shallow-clone.md) profile by delegating to `textaccounts create`. Useful for parallel agent runs that need their own auth without copying the whole config:
+
+```sh
+textsessions shallow new scratch-1 --from personal                       # plain shallow
+textsessions shallow new pp-run-7 --from personal --owner pp:run-7       # implies --ephemeral
+textsessions shallow new tmp --from work --ephemeral                     # GC-eligible
+```
+
+Validates that textaccounts is installed and configured, the parent profile exists, and the new name is free before invoking the CLI. Sessions launched on these profiles automatically get the lineage chip described under [Sessions](#sessions).
 
 ### Cleanup
 
@@ -235,9 +256,6 @@ recursive = true             # scan all git repos one level deep
 
 [ui]
 startup_repo = "current"     # "current" = auto-filter TUI to cwd repo | "all" = show everything
-claude_cmd = "claude"        # command to launch Claude; {profile} is substituted if present
-                             # e.g. "claude-{profile}" dispatches to fish functions like claude-work
-ai_search_profile = "claude" # command used for `textsessions search`
 
 [integrations]
 textaccounts = true  # use textaccounts for profile isolation if configured (see below)
@@ -247,17 +265,9 @@ textproxy = true     # inject ANTHROPIC_BASE_URL if textproxy is running on :747
 cache_dir = "~/.cache/textproxy"
 ```
 
-### Profiles and the `claude_cmd` template
+### Profiles
 
-Each repo has a `profile`. When launching or resuming a session, textsessions resolves the command to run via `claude_cmd` with `{profile}` substituted:
-
-```toml
-claude_cmd = "claude-{profile}"
-# mono (profile=work)    → runs: claude-work
-# blog (profile=default) → runs: claude-default
-```
-
-This lets you define fish functions (`claude-work`, `claude-personal`, etc.) that set environment or flags before calling `claude`. Useful for routing to different API keys or base URLs without textaccounts, or alongside it.
+Each repo has a `profile` (a textaccounts profile name, or `default` for no isolation). Profile switching is delegated to textaccounts via its public `textaccounts.api` surface — textsessions injects `CLAUDE_CONFIG_DIR` into the launched `claude` process based on the repo's profile. No custom shell wrappers required.
 
 ---
 
@@ -357,10 +367,23 @@ Start with the ones that solve the most common pain points for heavy Claude Code
 
 ---
 
+## Specs
+
+textsessions consumes specs published by other paperworlds tools, and owns one of its own:
+
+- **`textaccounts-api` v0.2.0** (consumer) — read-only public Python API for profile metadata, including shallow-clone lineage. textsessions imports only from `textaccounts.api`. See [docs/SPECS.yaml](docs/SPECS.yaml).
+- **`textsessions-hints` v0.1.0** (owner, draft producers) — file-based contract for annotating sessions at launch time with `{persona, owner, labels}`. textsessions reads `~/.cache/textsessions/hints/<session-uuid>.yaml`; producers like [textprompts](https://github.com/paperworlds/textprompts) write them. See [docs/specs/textsessions-hints.md](docs/specs/textsessions-hints.md).
+
+---
+
 ## Roadmap
 
-- [ ] Publish to PyPI
-- [ ] Upgrade to Python 3.13
+- [x] Publish to PyPI
+- [x] Upgrade to Python 3.13
+- [x] Surface shallow-clone lineage in CLI + TUI (`--shallow-only`, `--parent`, `--owner`, lineage chip)
+- [x] `ts shallow new` — create shallow-clone profiles by delegating to `textaccounts create`
+- [ ] Persona-aware sessions — consume `textsessions-hints` (persona column, `--persona` filter, `--label` filter)
+- [ ] `ts jump <repo>` — drop into the latest (or lead) session for a repo with one keystroke
 - [ ] Bash/zsh shell support (currently fish only)
 - [ ] `textsessions doctor` — validate config, check for stale paths
 - [ ] Session export to markdown
