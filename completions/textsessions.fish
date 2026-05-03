@@ -28,6 +28,13 @@ complete -c textsessions -f -n "__fish_use_subcommand" -a "config"         -d "S
 complete -c textsessions -f -n "__fish_use_subcommand" -a "profile"        -d "Manage profiles"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "search"         -d "Search sessions using natural language (AI-powered)"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "tree"           -d "Dump repos and sessions as YAML/JSON tree"
+complete -c textsessions -f -n "__fish_use_subcommand" -a "shallow"        -d "Manage shallow-clone profiles (delegates to textaccounts)"
+
+# shallow subcommands
+complete -c textsessions -f -n "__fish_seen_subcommand_from shallow; and not __fish_seen_subcommand_from new" -a "new" -d "Create a shallow-clone profile"
+complete -c textsessions -n "__fish_seen_subcommand_from shallow; and __fish_seen_subcommand_from new" -l from      -d "Parent profile" -xa "default work personal"
+complete -c textsessions -n "__fish_seen_subcommand_from shallow; and __fish_seen_subcommand_from new" -l owner     -d "Owner ID (implies --ephemeral)" -r
+complete -c textsessions -n "__fish_seen_subcommand_from shallow; and __fish_seen_subcommand_from new" -l ephemeral -d "Mark profile ephemeral"
 
 # new flags
 complete -c textsessions -n "__fish_seen_subcommand_from new" -s r -l repo     -d "Repo label" -rxa "data mono personal textlives textworld"

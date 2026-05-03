@@ -1112,6 +1112,61 @@ def repos_cmd() -> None:
         click.echo(f"REPO {repo.label} {repo.path}{meta}")
 
 
+@main.group("shallow")
+def shallow_group() -> None:
+    """Subcommands for shallow-clone profiles (delegates to textaccounts)."""
+
+
+@shallow_group.command("new")
+@click.argument("name")
+@click.option("--from", "parent", required=True, shell_complete=_complete_profiles,
+              help="Parent profile to shallow-clone from.")
+@click.option("--owner", default="", metavar="ID",
+              help="Owner ID for `textaccounts gc --owner` filtering. Implies --ephemeral.")
+@click.option("--ephemeral", is_flag=True,
+              help="Mark profile ephemeral so `textaccounts gc/destroy` can sweep it.")
+def shallow_new(name: str, parent: str, owner: str, ephemeral: bool) -> None:
+    """Create a shallow-clone profile by shelling out to `textaccounts create`.
+
+    Example: textsessions shallow new scratch-1 --from personal --owner pp:run-7
+    """
+    from .profiles import _HAS_TEXTACCOUNTS, list_textaccounts_profiles, textaccounts_available
+
+    if not _HAS_TEXTACCOUNTS:
+        raise click.UsageError(
+            "textaccounts is not installed.\n"
+            "Install it (uv tool install textaccounts) before using `ts shallow new`."
+        )
+    if not textaccounts_available():
+        raise click.UsageError(
+            "textaccounts is installed but not configured. Run: textaccounts init"
+        )
+    known = list_textaccounts_profiles()
+    if parent not in known:
+        available = ", ".join(known) if known else "(none)"
+        raise click.UsageError(
+            f"Parent profile '{parent}' not found in textaccounts. Available: {available}"
+        )
+    if name in known:
+        raise click.UsageError(f"Profile '{name}' already exists.")
+
+    if not shutil.which("textaccounts"):
+        raise click.UsageError(
+            "textaccounts CLI not on PATH (the Python API is available but `textaccounts` "
+            "binary is missing). `ts shallow new` shells out to the CLI."
+        )
+
+    cmd = ["textaccounts", "create", name, "--shallow", "--from", parent]
+    if owner:
+        cmd += ["--owner", owner]
+    if ephemeral and not owner:  # --owner already implies --ephemeral
+        cmd += ["--ephemeral"]
+
+    click.echo(f"$ {' '.join(shlex.quote(c) for c in cmd)}")
+    result = subprocess.run(cmd)
+    sys.exit(result.returncode)
+
+
 @main.group("repo")
 def repo_group() -> None:
     """Subcommands for managing configured repos."""
