@@ -103,6 +103,8 @@ class SessionDetail(Static):
         ]
         if s.is_shallow:
             lines.append(f"[bold]Lineage:[/bold] [cyan]{s.lineage_chip}[/cyan]")
+        if s.persona or s.labels:
+            lines.append(f"[bold]Persona:[/bold] [magenta]{s.persona_chip}[/magenta]")
         lines += [
             "",
             f"[bold]{detail_label}[/bold]    [dim]{detail_display}[/dim]",
@@ -303,7 +305,8 @@ class TextSessionsApp(ActionsMixin, App):
             tags = [t for t in s.tags if t != "archived"]
             tags_str = "  " + " ".join(f"[cyan]#{t}[/cyan]" for t in tags) if tags else ""
             shallow_str = f" [cyan]{s.lineage_chip}[/cyan]" if s.is_shallow else ""
-            profile_cell = f"{s.profile}{tags_str}{shallow_str}"
+            persona_str = f" [magenta]{s.persona_chip}[/magenta]" if (s.persona or s.labels) else ""
+            profile_cell = f"{s.profile}{tags_str}{shallow_str}{persona_str}"
             row = [name_cell]
             if not single_repo:
                 row.append(s.repo_label[:15])

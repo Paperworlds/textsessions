@@ -47,6 +47,51 @@ class Lineage:
 
 
 @dataclass
+class Hint:
+    """Per-session annotation written by external producers.
+
+    Read from ``~/.cache/textsessions/hints/<sid>.yaml`` at index time.
+    All fields optional; an empty Hint is treated as no hint.
+
+    # SPEC: textsessions-hints
+    """
+    persona: str = ""
+    owner: str = ""
+    labels: list[str] = field(default_factory=list)
+    started: str = ""
+
+    def is_empty(self) -> bool:
+        return not (self.persona or self.owner or self.labels or self.started)
+
+    def to_dict(self) -> dict:
+        out: dict = {}
+        if self.persona:
+            out["persona"] = self.persona
+        if self.owner:
+            out["owner"] = self.owner
+        if self.labels:
+            out["labels"] = list(self.labels)
+        if self.started:
+            out["started"] = self.started
+        return out
+
+    @classmethod
+    def from_dict(cls, d: dict | None) -> "Hint | None":
+        if not d:
+            return None
+        labels = d.get("labels") or []
+        if not isinstance(labels, list):
+            labels = []
+        h = cls(
+            persona=str(d.get("persona") or ""),
+            owner=str(d.get("owner") or ""),
+            labels=[str(x) for x in labels],
+            started=str(d.get("started") or ""),
+        )
+        return None if h.is_empty() else h
+
+
+@dataclass
 class Session:
     id: str
     name: str
@@ -60,6 +105,7 @@ class Session:
     pinned: bool = False
     description: str = ""
     lineage: Lineage | None = None
+    hint: Hint | None = None
 
     @classmethod
     def from_index_entry(cls, sid: str, entry: dict, repo_label: str, repo_path: Path) -> "Session":
@@ -77,6 +123,7 @@ class Session:
             pinned=bool(entry.get("pinned", False)),
             description=entry.get("description", ""),
             lineage=Lineage.from_dict(entry.get("lineage")),
+            hint=Hint.from_dict(entry.get("hint")),
         )
 
     @property
@@ -124,6 +171,47 @@ class Session:
     def is_shallow(self) -> bool:
         """Session was launched against a shallow-clone profile."""
         return self.lineage is not None
+
+    @property
+    def persona(self) -> str:
+        """Persona name from the hint file, or empty string."""
+        return self.hint.persona if self.hint else ""
+
+    @property
+    def labels(self) -> list[str]:
+        """Free-form labels from the hint file (separate from `tags`)."""
+        return list(self.hint.labels) if self.hint else []
+
+    @property
+    def merged_owner(self) -> str:
+        """Owner id from the hint, falling back to lineage.owner.
+
+        Hint takes precedence per spec-textsessions-hints v0.1.0:
+        producers may override the lineage owner with a finer-grained one.
+        """
+        if self.hint and self.hint.owner:
+            return self.hint.owner
+        if self.lineage and self.lineage.owner:
+            return self.lineage.owner
+        return ""
+
+    @property
+    def persona_chip(self) -> str:
+        """Short display string for persona/labels. Empty when nothing to show.
+
+        Examples:
+          [persona=agentic-pivot]
+          [persona=agentic-pivot, #pivot #private]
+          [#wip]
+        """
+        if not self.hint:
+            return ""
+        parts: list[str] = []
+        if self.hint.persona:
+            parts.append(f"persona={self.hint.persona}")
+        if self.hint.labels:
+            parts.append(" ".join(f"#{label}" for label in self.hint.labels))
+        return f"[{', '.join(parts)}]" if parts else ""
 
     @property
     def lineage_chip(self) -> str:
@@ -284,6 +372,8 @@ def filter_sessions(
     no_shallow: bool = False,
     parent: str = "",
     owner: str = "",
+    persona: str = "",
+    label: str = "",
 ) -> list[Session]:
     result = sessions
     if not show_archived:
@@ -319,7 +409,13 @@ def filter_sessions(
     if parent:
         result = [s for s in result if s.lineage and s.lineage.parent == parent]
     if owner:
-        result = [s for s in result if s.lineage and s.lineage.owner == owner]
+        # Match either hint.owner or lineage.owner (merged owner), per
+        # spec-textsessions-hints precedence rules.
+        result = [s for s in result if s.merged_owner == owner]
+    if persona:
+        result = [s for s in result if s.persona == persona]
+    if label:
+        result = [s for s in result if label in s.labels]
     return result
 
 

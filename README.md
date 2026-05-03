@@ -130,12 +130,16 @@ textsessions sessions --current-folder
 textsessions sessions --shallow-only            # only sessions on shallow profiles
 textsessions sessions --no-shallow              # hide them
 textsessions sessions --parent personal         # shallow profiles cloned from `personal`
-textsessions sessions --owner pp:run-7          # match an exact lineage owner id
+textsessions sessions --owner pp:run-7          # match an exact owner id (hint or lineage)
+
+# Persona/label filters (require a hint file — see "Specs" below)
+textsessions sessions --persona agentic-pivot
+textsessions sessions --label pivot
 ```
 
 The table shows: **Name**, **Info** (description if set, otherwise the auto-generated slug), Repo, Profile, Tags, Priority, Last Active.
 
-When any visible session runs on a shallow-clone profile, a **Lineage** column appears with chips like `[shallow ← personal, ephemeral, owner=pp:run-7]`. The chip is also rendered in the TUI row and detail panel.
+When any visible session runs on a shallow-clone profile, a **Lineage** column appears with chips like `[shallow ← personal, ephemeral, owner=pp:run-7]`. When any session has a hint file, a **Persona** column appears with chips like `[persona=agentic-pivot, #pivot #private]`. Both chips are also rendered in the TUI row and detail panel.
 
 ### Rename and tag
 
@@ -382,7 +386,7 @@ textsessions consumes specs published by other paperworlds tools, and owns one o
 - [x] Upgrade to Python 3.13
 - [x] Surface shallow-clone lineage in CLI + TUI (`--shallow-only`, `--parent`, `--owner`, lineage chip)
 - [x] `ts shallow new` — create shallow-clone profiles by delegating to `textaccounts create`
-- [ ] Persona-aware sessions — consume `textsessions-hints` (persona column, `--persona` filter, `--label` filter)
+- [x] Persona-aware sessions — consume `textsessions-hints` (persona column, `--persona`/`--label` filters; producer side in textprompts is the open task)
 - [ ] `ts jump <repo>` — drop into the latest (or lead) session for a repo with one keystroke
 - [ ] Bash/zsh shell support (currently fish only)
 - [ ] `textsessions doctor` — validate config, check for stale paths

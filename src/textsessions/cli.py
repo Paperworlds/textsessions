@@ -338,7 +338,12 @@ def _complete_session_names(ctx: click.Context, param: click.Parameter, incomple
 @click.option("--shallow-only", is_flag=True, help="Only sessions launched against shallow-clone profiles")
 @click.option("--no-shallow", is_flag=True, help="Hide shallow-clone sessions")
 @click.option("--parent", default="", metavar="PROFILE", help="Only shallow sessions cloned from PROFILE")
-@click.option("--owner", default="", metavar="ID", help="Only shallow sessions with this owner")
+@click.option("--owner", default="", metavar="ID",
+              help="Only sessions with this owner (matches hint.owner or lineage.owner)")
+@click.option("--persona", default="", metavar="NAME",
+              help="Only sessions whose textsessions-hints persona matches NAME")
+@click.option("--label", default="", metavar="LABEL",
+              help="Only sessions whose textsessions-hints labels include LABEL")
 @click.option("--resume", "resume_name", default="", metavar="NAME",
               shell_complete=_complete_session_names,
               help="Resume a session by name or ID prefix.")
@@ -347,6 +352,7 @@ def _complete_session_names(ctx: click.Context, param: click.Parameter, incomple
 @click.option("--reindex", is_flag=True, help="Rebuild indexes from .jsonl before listing")
 def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, by_priority: bool, limit: int,
                  shallow_only: bool, no_shallow: bool, parent: str, owner: str,
+                 persona: str, label: str,
                  resume_name: str, names_only: bool, reindex: bool) -> None:
     """Print session table (non-TUI, for scripting)."""
     config = load()
@@ -390,7 +396,8 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
         sys.exit(subprocess.run(cmd, env=env, cwd=cwd).returncode)
 
     filtered = filter_sessions(all_sessions, query=query, tag=tag, profile=profile, repo_label=repo,
-                               shallow_only=shallow_only, no_shallow=no_shallow, parent=parent, owner=owner)
+                               shallow_only=shallow_only, no_shallow=no_shallow, parent=parent, owner=owner,
+                               persona=persona, label=label)
     if by_priority:
         filtered = sort_by_priority(filtered)
     filtered = filtered[:limit]
@@ -401,6 +408,7 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
         return
 
     show_lineage_col = any(s.is_shallow for s in filtered)
+    show_persona_col = any(s.persona or s.labels for s in filtered)
 
     console = Console()
     table = Table(show_header=True, header_style="bold")
@@ -411,6 +419,8 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
     table.add_column("Profile")
     table.add_column("Tags")
     table.add_column("Pri")
+    if show_persona_col:
+        table.add_column("Persona", style="magenta")
     if show_lineage_col:
         table.add_column("Lineage", style="cyan")
     table.add_column("Last Active")
@@ -420,6 +430,8 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
         pri = s.display_priority
         info = s.description or s.slug
         row = [s.name, s.id[:8], info, s.repo_label, s.profile, tags_str, pri]
+        if show_persona_col:
+            row.append(s.persona_chip)
         if show_lineage_col:
             row.append(s.lineage_chip)
         row.append(s.last_active)

@@ -43,6 +43,14 @@ complete -c textsessions -n "__fish_seen_subcommand_from new" -s n -l name     -
 complete -c textsessions -n "__fish_seen_subcommand_from new" -l priority      -d "Priority level" -xa "H0 1 2 3"
 complete -c textsessions -n "__fish_seen_subcommand_from new" -s m -l model    -d "Claude model" -xa "opus sonnet haiku claude-sonnet-4-6 claude-opus-4-6 claude-haiku-4-5-20251001"
 
+# sessions filters
+complete -c textsessions -n "__fish_seen_subcommand_from sessions" -l shallow-only -d "Only shallow-clone sessions"
+complete -c textsessions -n "__fish_seen_subcommand_from sessions" -l no-shallow   -d "Hide shallow-clone sessions"
+complete -c textsessions -n "__fish_seen_subcommand_from sessions" -l parent       -d "Filter by shallow parent profile" -xa "default work personal"
+complete -c textsessions -n "__fish_seen_subcommand_from sessions" -l owner        -d "Filter by hint/lineage owner id" -r
+complete -c textsessions -n "__fish_seen_subcommand_from sessions" -l persona      -d "Filter by textsessions-hints persona" -r
+complete -c textsessions -n "__fish_seen_subcommand_from sessions" -l label        -d "Filter by textsessions-hints label" -r
+
 # reindex flags
 complete -c textsessions -n "__fish_seen_subcommand_from reindex" -l repo -d "Limit to repo" -xa "(textsessions sessions --json 2>/dev/null | python3 -c \"import sys,json; [print(s.get('repo','')) for s in json.load(sys.stdin) if s.get('repo')]\" 2>/dev/null | sort -u)"
 

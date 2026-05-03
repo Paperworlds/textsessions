@@ -232,7 +232,9 @@ def _migrate_legacy_priorities(repo_key: str, index: dict) -> None:
 
 def build_index(repo_key: str, pairs: list[str]) -> dict:
     """Rebuild YAML index from .jsonl files, preserving user-set fields."""
+    from .hints import read_hint
     from .profiles import get_profile_lineage
+    from .sessions import Hint
 
     old_index = load_index(repo_key)
     sessions = scan_sessions(pairs)
@@ -300,6 +302,18 @@ def build_index(repo_key: str, pairs: list[str]) -> dict:
             }
         elif old.get("lineage"):
             entry["lineage"] = old["lineage"]
+
+        # Session hints (spec-textsessions-hints v0.1.0): annotation files at
+        # ~/.cache/textsessions/hints/<sid>.yaml written by external producers
+        # (textprompts, etc.). Read-only, best-effort. Fall back to old index
+        # entry's hint when the hint file is gone — mirrors lineage behaviour.
+        # SPEC: textsessions-hints
+        hint_data = read_hint(sid)
+        hint_obj = Hint.from_dict(hint_data) if hint_data else None
+        if hint_obj is not None:
+            entry["hint"] = hint_obj.to_dict()
+        elif old.get("hint"):
+            entry["hint"] = old["hint"]
 
         new_index[sid] = entry
 
