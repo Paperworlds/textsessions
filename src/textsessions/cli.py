@@ -1243,11 +1243,23 @@ def jump_cmd(repo_label: str, lead: bool, dry_run: bool) -> None:
     # load_sessions already filters archived and sorts pinned-first / last_active desc.
 
     if lead:
-        eligible = [s for s in eligible if s.pinned or "lead" in s.labels]
+        def _is_lead(s) -> bool:
+            return (
+                s.pinned                              # TUI `p` or `ts pin`
+                or "lead" in s.tags                   # `ts tag NAME lead`
+                or "lead" in s.labels                 # textsessions-hints labels
+                or s.name == "lead"                   # name convention: exactly "lead"
+                or s.name.endswith("-lead")           # name convention: foo-lead
+                or s.name.endswith("_lead")           # name convention: foo_lead
+            )
+        eligible = [s for s in eligible if _is_lead(s)]
         if not eligible:
             click.echo(
-                f"No pinned or 'lead'-labelled session in '{repo_label}'.\n"
-                f"  Pin one in the TUI (`p` key) or write a textsessions-hints file with labels: [lead].",
+                f"No lead session in '{repo_label}'. A session is considered a lead if it is:\n"
+                f"  • pinned (TUI `p` key, or `textsessions pin <name>`)\n"
+                f"  • tagged 'lead' (`textsessions tag <name> lead`)\n"
+                f"  • named '<repo>-lead', '*-lead', '*_lead', or 'lead'\n"
+                f"  • carries `labels: [lead]` in its textsessions-hints file",
                 err=True,
             )
             sys.exit(1)

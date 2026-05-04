@@ -179,7 +179,14 @@ textsessions jump textsessions --lead   # pinned (or `lead`-labelled) session in
 textsessions jump --dry-run             # print what would resume, don't exec
 ```
 
-Skips automated runners (pp workers, CI) and hex-named throwaway sessions. With `--lead`, matches sessions you've pinned (TUI `p` key, or `textsessions pin <name>`) **or** sessions whose textsessions-hints file carries `labels: [lead]`.
+Skips automated runners (pp workers, CI) and hex-named throwaway sessions. With `--lead`, a session counts as the lead if any of these hold:
+
+- pinned (TUI `p` key, or `textsessions pin <name>`)
+- tagged `lead` (`textsessions tag <name> lead`)
+- named `lead`, `*-lead`, or `*_lead` (naming convention)
+- carries `labels: [lead]` in its textsessions-hints file
+
+Most-recent match wins. When `--repo` is a shortened paperworlds label (e.g. `proxy` → `textproxy`), the tmux pane is renamed to your typed shorthand verbatim — no profile suffix.
 
 ### Pin and unpin
 

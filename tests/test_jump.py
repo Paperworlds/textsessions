@@ -127,8 +127,36 @@ def test_jump_lead_no_candidate_errors():
     plain = _s(name="plain")
     result, run = _invoke(["foo", "--lead"], [plain])
     assert result.exit_code == 1
-    assert "No pinned or 'lead'-labelled session" in (result.output + result.stderr)
+    assert "No lead session in 'foo'" in (result.output + result.stderr)
     run.assert_not_called()
+
+
+def test_jump_lead_matches_name_suffix_lead():
+    """Session named 'prompts-lead' counts as the lead by naming convention."""
+    plain = _s(name="prompts-something", id="p" * 32)
+    leadish = _s(name="prompts-lead", id="l" * 32)
+    result, _ = _invoke(["foo", "--lead"], [plain, leadish])
+    assert "resuming prompts-lead" in (result.output + result.stderr)
+
+
+def test_jump_lead_matches_underscore_lead():
+    s = _s(name="something_lead")
+    result, _ = _invoke(["foo", "--lead"], [s])
+    assert "resuming something_lead" in (result.output + result.stderr)
+
+
+def test_jump_lead_matches_exact_lead_name():
+    s = _s(name="lead")
+    result, _ = _invoke(["foo", "--lead"], [s])
+    assert "resuming lead" in (result.output + result.stderr)
+
+
+def test_jump_lead_matches_lead_tag():
+    """`ts tag NAME lead` should make it lead-eligible."""
+    plain = _s(name="plain", id="p" * 32)
+    tagged = _s(name="other", tags=["lead"], id="t" * 32)
+    result, _ = _invoke(["foo", "--lead"], [plain, tagged])
+    assert "resuming other" in (result.output + result.stderr)
 
 
 # --- error paths ------------------------------------------------------------

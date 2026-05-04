@@ -161,8 +161,14 @@ def resume_cmd(
     claude_cmd = f"claude --resume {shlex.quote(session_id)}"
 
     if os.environ.get("TMUX"):
-        base_label = window_label or (session_name or session_id)[:8]
-        suffix = f"-{profile[0]}" if profile else ""
+        if window_label:
+            # Caller-supplied label is taken verbatim — they already chose what
+            # they want to see in the pane list, no profile suffix needed.
+            base_label = window_label
+            suffix = ""
+        else:
+            base_label = (session_name or session_id)[:8]
+            suffix = f"-{profile[0]}" if profile else ""
         window_name = shlex.quote(f"{base_label}{suffix}")
         fish_cmd = f"tmux rename-window {window_name}; set -lx CLAUDE_RESUME_NAME {window_name}; {claude_cmd}"
     else:
