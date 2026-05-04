@@ -19,30 +19,3 @@ ideas:
       **Why:** Sessions have slugs and descriptions but almost no tags.
       Manual tagging at scale is tedious. Cached LLM runs make re-runs cheap.
 
-  - id: jump-to-latest-session-per-repo
-    title: ts jump — open the latest (or lead) session for a given repo
-    status: idea
-    priority: 1
-    summary: |
-      Quick navigation: "for repo X, take me straight to the most recent
-      session" — ideally a one-liner so it works from any shell or editor.
-
-      **Approach (sketch):**
-      - `ts jump <repo-label>` → resolve repo, find newest session by
-        `last_active` in that repo's index, run `ts resume <id>`.
-      - `--lead` flag → open the lead session instead of newest
-        (lead = the persona/owner that orchestrates, e.g. `pp lead`).
-        Definition of "lead" needs nailing down — could be:
-          (a) persona == "<repo>-lead" by convention,
-          (b) most recently opened session whose owner is `pp:lead:*`,
-          (c) explicit pin via metadata flag on a session.
-      - Fish completion on `<repo-label>`.
-
-      **Why:** Daily friction. The whole reason for the triage layer was
-      "sessions pile up" — but the most common need is just "drop me into
-      the right pile, pre-filtered to the active row". Today that's
-      `ts view` → arrow-down → enter; could be one command.
-
-      **Open:** does this live as `ts jump` (new verb) or `ts resume --repo X
-      --latest`? Lean toward `jump` because it's the verb users will want
-      to alias to a single keystroke.

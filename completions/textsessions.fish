@@ -29,6 +29,13 @@ complete -c textsessions -f -n "__fish_use_subcommand" -a "profile"        -d "M
 complete -c textsessions -f -n "__fish_use_subcommand" -a "search"         -d "Search sessions using natural language (AI-powered)"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "tree"           -d "Dump repos and sessions as YAML/JSON tree"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "shallow"        -d "Manage shallow-clone profiles (delegates to textaccounts)"
+complete -c textsessions -f -n "__fish_use_subcommand" -a "jump"           -d "Resume the latest (or lead) session in a repo"
+
+# jump: positional repo label + flags
+complete -c textsessions -n "__fish_seen_subcommand_from jump; and not __fish_seen_subcommand_from --lead --dry-run" \
+    -xa "(textsessions repos 2>/dev/null | awk '{print $2}')"
+complete -c textsessions -n "__fish_seen_subcommand_from jump" -l lead    -d "Pick a pinned or 'lead'-labelled session"
+complete -c textsessions -n "__fish_seen_subcommand_from jump" -l dry-run -d "Print and exit without exec"
 
 # shallow subcommands
 complete -c textsessions -f -n "__fish_seen_subcommand_from shallow; and not __fish_seen_subcommand_from new" -a "new" -d "Create a shallow-clone profile"

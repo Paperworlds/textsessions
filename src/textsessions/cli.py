@@ -35,6 +35,41 @@ except Exception:
     _version_str = __version__
 
 
+def _resume_session(s, config, *, dry_run: bool = False) -> int:
+    """Resume *s* by exec'ing `claude --resume`. Returns the child's exit code.
+
+    Centralises the launch path used by `ts sessions --resume`, `ts jump`,
+    and any future caller. Validates the repo path still exists, builds the
+    profile-aware env via ``build_launch_env``, and prints a confirmation
+    line so the user sees which session is being resumed before claude
+    takes over the terminal.
+
+    With ``dry_run=True`` the command is printed but not executed; the
+    return value is 0.
+    """
+    cwd = s.repo_path
+    if not cwd.exists():
+        click.echo(
+            f"Error: repo path no longer exists: {cwd}\n"
+            f"  Session '{s.name}' belongs to repo '{s.repo_label}'.\n"
+            f"  If the folder moved, update it with:\n"
+            f"    textsessions repo move {s.repo_label} /new/path",
+            err=True,
+        )
+        return 1
+    from .profiles import build_launch_env, resume_cmd
+    env = build_launch_env(s.profile, {
+        "textaccounts": config.integrations.textaccounts,
+        "textproxy": config.integrations.textproxy,
+    })
+    cmd = resume_cmd(s.id, s.name, s.profile, env)
+    click.echo(f"→ resuming {s.name} [{s.id[:8]}] in {s.repo_label}", err=True)
+    if dry_run:
+        click.echo(f"  (dry-run) would exec: {' '.join(cmd)}", err=True)
+        return 0
+    return subprocess.run(cmd, env=env, cwd=cwd).returncode
+
+
 def _resolve_repo_from_cwd(config, *, add_hint: str = "Run: textsessions add .") -> RepoConfig:
     """Return the deepest configured repo whose path contains CWD, or exit."""
     cwd = Path.cwd()
@@ -379,21 +414,7 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
         if not matched:
             click.echo(f"No session matching '{resume_name}'", err=True)
             sys.exit(1)
-        s = matched[0]
-        cwd = s.repo_path
-        if not cwd.exists():
-            click.echo(
-                f"Error: repo path no longer exists: {cwd}\n"
-                f"  Session '{s.name}' belongs to repo '{s.repo_label}'.\n"
-                f"  If the folder moved, update it with:\n"
-                f"    textsessions repo move {s.repo_label} /new/path",
-                err=True,
-            )
-            sys.exit(1)
-        from .profiles import build_launch_env, resume_cmd
-        env = build_launch_env(s.profile, {"textaccounts": config.integrations.textaccounts, "textproxy": config.integrations.textproxy})
-        cmd = resume_cmd(s.id, s.name, s.profile, env)
-        sys.exit(subprocess.run(cmd, env=env, cwd=cwd).returncode)
+        sys.exit(_resume_session(matched[0], config))
 
     filtered = filter_sessions(all_sessions, query=query, tag=tag, profile=profile, repo_label=repo,
                                shallow_only=shallow_only, no_shallow=no_shallow, parent=parent, owner=owner,
@@ -1122,6 +1143,64 @@ def repos_cmd() -> None:
     for repo in config.repos:
         meta = f" profile={repo.profile}" if repo.profile else ""
         click.echo(f"REPO {repo.label} {repo.path}{meta}")
+
+
+@main.command("jump")
+@click.argument("repo_label", required=False, default="",
+                shell_complete=_complete_repo_labels)
+@click.option("--lead", "lead", is_flag=True,
+              help="Pick a pinned or 'lead'-labelled session instead of the latest.")
+@click.option("--dry-run", is_flag=True,
+              help="Print what would be resumed and exit 0.")
+def jump_cmd(repo_label: str, lead: bool, dry_run: bool) -> None:
+    """Resume the latest (or lead) session in a repo with one keystroke.
+
+    Without an argument, resolves the repo from the current working directory.
+    With --lead, picks a session marked as the lead — either pinned (TUI `p`)
+    or carrying a `lead` label in its textsessions-hints file.
+
+    Example:  ts jump textsessions --lead
+    """
+    config = load()
+    if not config.repos:
+        click.echo("No repos configured. Run: textsessions init", err=True)
+        sys.exit(1)
+
+    if repo_label:
+        matches = [r for r in config.repos if r.label == repo_label]
+        if not matches:
+            available = ", ".join(r.label for r in config.repos) or "(none)"
+            raise click.UsageError(f"No repo with label '{repo_label}'. Available: {available}")
+    else:
+        repo_label = _resolve_repo_from_cwd(config).label
+
+    sessions = load_sessions(config)
+    eligible = [
+        s for s in sessions
+        if (s.repo_label == repo_label or s.repo_label.startswith(repo_label + "/"))
+        and not s.is_automated
+        and not s.is_orphan
+    ]
+    # load_sessions already filters archived and sorts pinned-first / last_active desc.
+
+    if lead:
+        eligible = [s for s in eligible if s.pinned or "lead" in s.labels]
+        if not eligible:
+            click.echo(
+                f"No pinned or 'lead'-labelled session in '{repo_label}'.\n"
+                f"  Pin one in the TUI (`p` key) or write a textsessions-hints file with labels: [lead].",
+                err=True,
+            )
+            sys.exit(1)
+    elif not eligible:
+        click.echo(
+            f"No interactive sessions in '{repo_label}'.\n"
+            f"  Start one with: textsessions new --repo {repo_label}",
+            err=True,
+        )
+        sys.exit(1)
+
+    sys.exit(_resume_session(eligible[0], config, dry_run=dry_run))
 
 
 @main.group("shallow")

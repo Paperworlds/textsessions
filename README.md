@@ -167,6 +167,19 @@ textsessions search "auth refactor" --profile work    # use a textaccounts profi
 
 Sends session metadata to Claude and returns ranked matches. With `--profile`, the underlying `claude -p` call runs under that textaccounts profile (validated up front).
 
+### Jump
+
+Resume the latest (or lead) session in a repo with one keystroke. From inside a configured repo, no argument is needed:
+
+```sh
+textsessions jump                       # resume the latest interactive session in the CWD repo
+textsessions jump textsessions          # explicit repo label
+textsessions jump textsessions --lead   # pinned (or `lead`-labelled) session instead of latest
+textsessions jump --dry-run             # print what would resume, don't exec
+```
+
+Skips automated runners (pp workers, CI) and hex-named throwaway sessions. With `--lead`, matches sessions you've pinned in the TUI (`p` key) **or** sessions whose textsessions-hints file carries `labels: [lead]`.
+
 ### Shallow profiles
 
 `ts shallow new` creates a [shallow-clone](https://github.com/paperworlds/textaccounts/blob/main/docs/specs/shallow-clone.md) profile by delegating to `textaccounts create`. Useful for parallel agent runs that need their own auth without copying the whole config:
@@ -387,7 +400,7 @@ textsessions consumes specs published by other paperworlds tools, and owns one o
 - [x] Surface shallow-clone lineage in CLI + TUI (`--shallow-only`, `--parent`, `--owner`, lineage chip)
 - [x] `ts shallow new` — create shallow-clone profiles by delegating to `textaccounts create`
 - [x] Persona-aware sessions — consume `textsessions-hints` (persona column, `--persona`/`--label` filters; producer side in textprompts is the open task)
-- [ ] `ts jump <repo>` — drop into the latest (or lead) session for a repo with one keystroke
+- [x] `ts jump <repo>` — drop into the latest (or lead) session for a repo with one keystroke
 - [ ] Bash/zsh shell support (currently fish only)
 - [ ] `textsessions doctor` — validate config, check for stale paths
 - [ ] Session export to markdown
