@@ -178,7 +178,16 @@ textsessions jump textsessions --lead   # pinned (or `lead`-labelled) session in
 textsessions jump --dry-run             # print what would resume, don't exec
 ```
 
-Skips automated runners (pp workers, CI) and hex-named throwaway sessions. With `--lead`, matches sessions you've pinned in the TUI (`p` key) **or** sessions whose textsessions-hints file carries `labels: [lead]`.
+Skips automated runners (pp workers, CI) and hex-named throwaway sessions. With `--lead`, matches sessions you've pinned (TUI `p` key, or `textsessions pin <name>`) **or** sessions whose textsessions-hints file carries `labels: [lead]`.
+
+### Pin and unpin
+
+```sh
+textsessions pin my-feature-work       # stick this session at the top + eligible for `jump --lead`
+textsessions unpin my-feature-work     # remove the pin
+```
+
+The TUI `p` key does the same thing.
 
 ### Shallow profiles
 

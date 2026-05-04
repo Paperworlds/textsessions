@@ -515,6 +515,32 @@ def tag_cmd(name: str, tags_csv: str) -> None:
     click.echo(f"  {s.id[:8]}  tags: {', '.join(remaining) if remaining else '(none)'}")
 
 
+@main.command("pin")
+@click.argument("name", shell_complete=_complete_session_names)
+def pin_cmd(name: str) -> None:
+    """Pin a session (sticks at the top, eligible for `ts jump --lead`)."""
+    from .config import repo_key as _repo_key
+    from .indexer import do_pin, mutate_index
+    config = load()
+    s = _resolve_session_by_name(name, config)
+    rk = _repo_key(s.repo_path)
+    mutate_index(rk, s.id, lambda index, sid: do_pin(index, sid, True))
+    click.echo(f"  {s.id[:8]}  pinned  {s.name}")
+
+
+@main.command("unpin")
+@click.argument("name", shell_complete=_complete_session_names)
+def unpin_cmd(name: str) -> None:
+    """Unpin a session."""
+    from .config import repo_key as _repo_key
+    from .indexer import do_pin, mutate_index
+    config = load()
+    s = _resolve_session_by_name(name, config)
+    rk = _repo_key(s.repo_path)
+    mutate_index(rk, s.id, lambda index, sid: do_pin(index, sid, False))
+    click.echo(f"  {s.id[:8]}  unpinned  {s.name}")
+
+
 @main.command()
 def proxy() -> None:
     """Show token proxy stats."""
