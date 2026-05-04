@@ -137,19 +137,31 @@ def validate_explicit_profile(name: str) -> None:
 
 # --- launch helpers ----------------------------------------------------------
 
-def resume_cmd(session_id: str, session_name: str, profile: str, env: dict[str, str]) -> list[str]:
+def resume_cmd(
+    session_id: str,
+    session_name: str,
+    profile: str,
+    env: dict[str, str],
+    *,
+    window_label: str = "",
+) -> list[str]:
     """Return the argv list to resume a Claude session.
 
     Profile selection happens via `env` (textaccounts injects CLAUDE_CONFIG_DIR);
     this function always invokes plain `claude`. Wrapped in `fish -c` so the
     optional tmux window rename runs in the same shell.
+
+    *window_label*: override for the tmux window name. When set (e.g. by
+    ``ts jump <repo>``), it replaces the session-name-derived label so the
+    tmux pane reflects the repo the user asked for. Profile suffix still
+    applied. Empty falls back to the legacy session-name-prefix behaviour.
     """
     import shlex
 
     claude_cmd = f"claude --resume {shlex.quote(session_id)}"
 
     if os.environ.get("TMUX"):
-        base_label = (session_name or session_id)[:8]
+        base_label = window_label or (session_name or session_id)[:8]
         suffix = f"-{profile[0]}" if profile else ""
         window_name = shlex.quote(f"{base_label}{suffix}")
         fish_cmd = f"tmux rename-window {window_name}; set -lx CLAUDE_RESUME_NAME {window_name}; {claude_cmd}"

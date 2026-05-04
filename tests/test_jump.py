@@ -188,6 +188,24 @@ def test_jump_exact_match_wins_over_sugar():
     assert "resuming plain-one" in (result.output + result.stderr)
 
 
+def test_jump_passes_user_typed_label_as_window_label():
+    """The user's typed shorthand becomes the tmux window label override."""
+    cfg = Config(repos=[
+        RepoConfig(path=Path("/p/textproxy"), label="textproxy", profile="personal"),
+    ])
+    s = _s(name="proxy-sess", repo_label="textproxy", repo_path=Path("/p/textproxy"))
+    with patch("textsessions.cli.load", return_value=cfg), \
+         patch("textsessions.cli.load_sessions", return_value=[s]), \
+         patch("pathlib.Path.exists", return_value=True), \
+         patch("textsessions.cli.subprocess.run", return_value=MagicMock(returncode=0)), \
+         patch("textsessions.profiles.build_launch_env", return_value={}), \
+         patch("textsessions.profiles.resume_cmd", return_value=["fish", "-c", "claude"]) as resume_mock:
+        result = CliRunner().invoke(main, ["jump", "proxy"])
+    assert result.exit_code == 0
+    # window_label should be "proxy" (what the user typed), not "textproxy"
+    assert resume_mock.call_args.kwargs["window_label"] == "proxy"
+
+
 def test_jump_no_arg_uses_cwd():
     """No positional repo → falls back to _resolve_repo_from_cwd."""
     cfg = _cfg()

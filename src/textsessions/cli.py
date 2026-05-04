@@ -54,7 +54,7 @@ def _resolve_repo_label(config, label: str) -> RepoConfig | None:
     return None
 
 
-def _resume_session(s, config, *, dry_run: bool = False) -> int:
+def _resume_session(s, config, *, dry_run: bool = False, window_label: str = "") -> int:
     """Resume *s* by exec'ing `claude --resume`. Returns the child's exit code.
 
     Centralises the launch path used by `ts sessions --resume`, `ts jump`,
@@ -62,6 +62,9 @@ def _resume_session(s, config, *, dry_run: bool = False) -> int:
     profile-aware env via ``build_launch_env``, and prints a confirmation
     line so the user sees which session is being resumed before claude
     takes over the terminal.
+
+    *window_label*: optional override for the tmux window name (forwarded
+    to ``resume_cmd``). Empty falls back to the session-name-derived default.
 
     With ``dry_run=True`` the command is printed but not executed; the
     return value is 0.
@@ -81,7 +84,7 @@ def _resume_session(s, config, *, dry_run: bool = False) -> int:
         "textaccounts": config.integrations.textaccounts,
         "textproxy": config.integrations.textproxy,
     })
-    cmd = resume_cmd(s.id, s.name, s.profile, env)
+    cmd = resume_cmd(s.id, s.name, s.profile, env, window_label=window_label)
     click.echo(f"→ resuming {s.name} [{s.id[:8]}] in {s.repo_label}", err=True)
     if dry_run:
         click.echo(f"  (dry-run) would exec: {' '.join(cmd)}", err=True)
@@ -1216,6 +1219,10 @@ def jump_cmd(repo_label: str, lead: bool, dry_run: bool) -> None:
         click.echo("No repos configured. Run: textsessions init", err=True)
         sys.exit(1)
 
+    # Preserve the user's typed shorthand for the tmux window name — `ts jump
+    # proxy` should rename the pane to "proxy" even though it resolves to
+    # `textproxy`. When no arg is given, fall back to the resolved repo label.
+    user_typed_label = repo_label
     if repo_label:
         match = _resolve_repo_label(config, repo_label)
         if not match:
@@ -1224,6 +1231,7 @@ def jump_cmd(repo_label: str, lead: bool, dry_run: bool) -> None:
         repo_label = match.label
     else:
         repo_label = _resolve_repo_from_cwd(config).label
+    window_label = user_typed_label or repo_label
 
     sessions = load_sessions(config)
     eligible = [
@@ -1251,7 +1259,7 @@ def jump_cmd(repo_label: str, lead: bool, dry_run: bool) -> None:
         )
         sys.exit(1)
 
-    sys.exit(_resume_session(eligible[0], config, dry_run=dry_run))
+    sys.exit(_resume_session(eligible[0], config, dry_run=dry_run, window_label=window_label))
 
 
 @main.group("shallow")
