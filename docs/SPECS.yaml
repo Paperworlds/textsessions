@@ -1,3 +1,10 @@
+owns:
+  - slug: textsessions-hints
+    version: 0.1.0
+    spec_path: docs/specs/textsessions-hints.md
+    consumers:
+      - textprompts
+
 follows:
   - slug: textaccounts-api-v0-2
     pinned_version: "0.2.0"
