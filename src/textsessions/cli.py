@@ -35,14 +35,30 @@ except Exception:
     _version_str = __version__
 
 
-def _resolve_repo_label(config, label: str) -> RepoConfig | None:
+def _die(msg: str, *, code: int = 1) -> None:
+    """Print *msg* to stderr and exit. Centralises ``click.echo(..., err=True); sys.exit(...)`` pairs."""
+    click.echo(msg, err=True)
+    sys.exit(code)
+
+
+def _require_repos(config) -> None:
+    """Bail out with a friendly hint when no repos are configured."""
+    if not config.repos:
+        _die("No repos configured. Run: textsessions init")
+
+
+def _resolve_repo_label(config, label: str, *, strict: bool = False) -> RepoConfig | None:
     """Match a repo label tolerantly: exact, then with 'text' prefix.
 
     Lets users type ``ts jump proxy`` and have it resolve to ``textproxy``,
-    matching the paperworlds 'text*' naming convention. Returns None if
-    nothing matches; caller produces the error.
+    matching the paperworlds 'text*' naming convention.
+
+    With ``strict=True``, prints a labelled error and exits when nothing
+    matches — convenient for commands that always require a hit.
     """
     if not label:
+        if strict:
+            _die("No repo label given.")
         return None
     for r in config.repos:
         if r.label == label:
@@ -51,6 +67,9 @@ def _resolve_repo_label(config, label: str) -> RepoConfig | None:
     for r in config.repos:
         if r.label == sugar:
             return r
+    if strict:
+        available = ", ".join(r.label for r in config.repos) or "(none)"
+        _die(f"No repo with label '{label}'. Available: {available}")
     return None
 
 
@@ -108,8 +127,7 @@ def _resolve_repo_from_cwd(config, *, add_hint: str = "Run: textsessions add .")
             best = r
     if best is None:
         click.echo(f"No configured repo matches current directory ({cwd}).", err=True)
-        click.echo(add_hint, err=True)
-        sys.exit(1)
+        _die(add_hint)
     if best.path != cwd and (cwd / ".git").exists():
         click.echo(f"Note: '{cwd.name}' is not configured — matched parent '{best.label}'. Run: textsessions add .", err=True)
     return best
@@ -176,7 +194,7 @@ def _complete_profiles(ctx: click.Context, param: click.Parameter, incomplete: s
 def new_cmd(repo_label: str, profile: str, name: str, priority: str | None, model: str) -> None:
     """Launch a new Claude Code session in a configured repo."""
 
-    from .config import detect_claude_dirs, repo_key as _repo_key
+    from .config import detect_claude_dirs
     from .indexer import (
         do_priority,
         find_session_created_after,
@@ -187,9 +205,7 @@ def new_cmd(repo_label: str, profile: str, name: str, priority: str | None, mode
     from .profiles import build_launch_env, validate_explicit_profile
 
     config = load()
-    if not config.repos:
-        click.echo("No repos configured. Run: textsessions init", err=True)
-        sys.exit(1)
+    _require_repos(config)
 
     # Resolve repo: explicit label or detect from cwd
     if repo_label:
@@ -203,8 +219,7 @@ def new_cmd(repo_label: str, profile: str, name: str, priority: str | None, mode
                 matched_repos = [sugared]
         if not matched_repos:
             labels = ", ".join(r.label for r in config.repos)
-            click.echo(f"No repo matching '{repo_label}'. Available: {labels}", err=True)
-            sys.exit(1)
+            _die(f"No repo matching '{repo_label}'. Available: {labels}")
         repo = matched_repos[0]
     else:
         repo = _resolve_repo_from_cwd(config, add_hint="Add it with: textsessions add .")
@@ -217,7 +232,7 @@ def new_cmd(repo_label: str, profile: str, name: str, priority: str | None, mode
         validate_explicit_profile(profile)
 
     # Snapshot for post-launch metadata
-    rk = _repo_key(repo.path)
+    rk = repo_key(repo.path)
     known_ids: set[str] = set(load_index(rk).keys())
     launch_time = datetime.utcnow()
 
@@ -366,8 +381,7 @@ def reindex(repo_label: str) -> None:
     if repo_label:
         repos = [r for r in repos if r.label == repo_label or r.label.startswith(repo_label + "/")]
         if not repos:
-            click.echo(f"No repo matching '{repo_label}'", err=True)
-            sys.exit(1)
+            _die(f"No repo matching '{repo_label}'")
     claude_dirs = detect_claude_dirs()
     total = reindex_repos(list(repos), claude_dirs)
     if CACHE_PATH.exists():
@@ -439,8 +453,7 @@ def sessions_cmd(query: str, tag: str, profile: str, repo: str, use_cwd: bool, b
     if resume_name:
         matched = [s for s in all_sessions if s.name == resume_name or s.id.startswith(resume_name) or s.name.startswith(resume_name)]
         if not matched:
-            click.echo(f"No session matching '{resume_name}'", err=True)
-            sys.exit(1)
+            _die(f"No session matching '{resume_name}'")
         sys.exit(_resume_session(matched[0], config))
 
     filtered = filter_sessions(all_sessions, query=query, tag=tag, profile=profile, repo_label=repo,
@@ -493,8 +506,7 @@ def _resolve_session_by_name(name: str, config):
     sessions = load_sessions(config)
     matched = [s for s in sessions if s.name == name or s.id.startswith(name) or s.name.startswith(name)]
     if not matched:
-        click.echo(f"No session matching '{name}'", err=True)
-        sys.exit(1)
+        _die(f"No session matching '{name}'")
     return matched[0]
 
 
@@ -503,12 +515,11 @@ def _resolve_session_by_name(name: str, config):
 @click.argument("new_title", nargs=-1, required=True)
 def rename_cmd(name: str, new_title: tuple[str, ...]) -> None:
     """Rename a session by name."""
-    from .config import repo_key as _repo_key
     from .indexer import do_rename, mutate_index
     title = " ".join(new_title)
     config = load()
     s = _resolve_session_by_name(name, config)
-    rk = _repo_key(s.repo_path)
+    rk = repo_key(s.repo_path)
     result: dict = {}
     def _rename(index, sid):
         do_rename(index, sid, title, repo_key=rk)
@@ -522,11 +533,10 @@ def rename_cmd(name: str, new_title: tuple[str, ...]) -> None:
 @click.argument("tags_csv")
 def tag_cmd(name: str, tags_csv: str) -> None:
     """Add or remove tags on a session (prefix with - to remove, e.g. auth,-old)."""
-    from .config import repo_key as _repo_key
     from .indexer import do_tag, do_untag, mutate_index
     config = load()
     s = _resolve_session_by_name(name, config)
-    rk = _repo_key(s.repo_path)
+    rk = repo_key(s.repo_path)
     parts = [t.strip() for t in tags_csv.split(",") if t.strip()]
     to_add = [t for t in parts if not t.startswith("-")]
     to_remove = [t[1:] for t in parts if t.startswith("-")]
@@ -546,11 +556,10 @@ def tag_cmd(name: str, tags_csv: str) -> None:
 @click.argument("name", shell_complete=_complete_session_names)
 def pin_cmd(name: str) -> None:
     """Pin a session (sticks at the top, eligible for `ts jump --lead`)."""
-    from .config import repo_key as _repo_key
     from .indexer import do_pin, mutate_index
     config = load()
     s = _resolve_session_by_name(name, config)
-    rk = _repo_key(s.repo_path)
+    rk = repo_key(s.repo_path)
     mutate_index(rk, s.id, lambda index, sid: do_pin(index, sid, True))
     click.echo(f"  {s.id[:8]}  pinned  {s.name}")
 
@@ -559,11 +568,10 @@ def pin_cmd(name: str) -> None:
 @click.argument("name", shell_complete=_complete_session_names)
 def unpin_cmd(name: str) -> None:
     """Unpin a session."""
-    from .config import repo_key as _repo_key
     from .indexer import do_pin, mutate_index
     config = load()
     s = _resolve_session_by_name(name, config)
-    rk = _repo_key(s.repo_path)
+    rk = repo_key(s.repo_path)
     mutate_index(rk, s.id, lambda index, sid: do_pin(index, sid, False))
     click.echo(f"  {s.id[:8]}  unpinned  {s.name}")
 
@@ -603,18 +611,15 @@ def proxy() -> None:
 def _scan_ghosts_keep(all_sessions: list, keep_prefix: str, repo_label: str) -> None:
     """--keep mode: tag one session as 'keep' to permanently exclude from orphan detection."""
     from .indexer import do_tag, load_index, save_index, write_legacy_tsv
-    from .config import repo_key as _repo_key
     if not repo_label:
-        click.echo("--repo is required when using --keep", err=True)
-        sys.exit(1)
+        _die("--repo is required when using --keep")
     matched = [s for s in all_sessions if s.id.startswith(keep_prefix)]
     if not matched:
         matched = [s for s in all_sessions if s.name.startswith(keep_prefix)]
     if not matched:
-        click.echo(f"No session matching '{keep_prefix}'", err=True)
-        sys.exit(1)
+        _die(f"No session matching '{keep_prefix}'")
     s = matched[0]
-    rkey = _repo_key(s.repo_path)
+    rkey = repo_key(s.repo_path)
     index = load_index(rkey)
     index = do_tag(index, s.id, "keep")
     save_index(rkey, index)
@@ -626,10 +631,8 @@ def _scan_ghosts_keep(all_sessions: list, keep_prefix: str, repo_label: str) -> 
 def _scan_ghosts_keep_all(all_sessions: list, repo_label: str) -> None:
     """--keep-all mode: tag every detected orphan in the repo as 'keep'."""
     from .indexer import do_tag, load_index, save_index, write_legacy_tsv
-    from .config import repo_key as _repo_key
     if not repo_label:
-        click.echo("--repo is required when using --keep-all", err=True)
-        sys.exit(1)
+        _die("--repo is required when using --keep-all")
     orphans_to_keep = [s for s in all_sessions if not s.is_ghost and s.is_orphan]
     if not orphans_to_keep:
         click.echo(f"No orphans found in {repo_label}.")
@@ -639,7 +642,7 @@ def _scan_ghosts_keep_all(all_sessions: list, repo_label: str) -> None:
         by_path.setdefault(str(s.repo_path), []).append(s)
     kept = 0
     for repo_path_str, sessions in by_path.items():
-        rkey = _repo_key(Path(repo_path_str))
+        rkey = repo_key(Path(repo_path_str))
         index = load_index(rkey)
         for s in sessions:
             index = do_tag(index, s.id, "keep")
@@ -700,14 +703,13 @@ def _scan_ghosts_delete(flagged: list, yes: bool, console: "Console") -> None:  
 def _scan_ghosts_archive(flagged: list, repo_label: str, do_discard: bool, console: "Console") -> None:  # type: ignore[name-defined]
     """--archive/--discard mode: tag sessions as 'archived'."""
     from .indexer import do_tag, load_index, save_index, write_legacy_tsv
-    from .config import repo_key as _repo_key
     archived = 0
     # Group by repo_path to batch index loads
     by_path: dict[str, list] = {}
     for s in flagged:
         by_path.setdefault(str(s.repo_path), []).append(s)
     for repo_path_str, sessions in by_path.items():
-        rkey = _repo_key(Path(repo_path_str))
+        rkey = repo_key(Path(repo_path_str))
         index = load_index(rkey)
         for s in sessions:
             if s.id in index and "archived" not in index[s.id].get("tags", []):
@@ -892,8 +894,7 @@ def index_priority(repo_key_arg: str, prefix: str, level: str) -> None:
         return
 
     if level not in ("H0", "1", "2", "3", "clear"):
-        click.echo(f"Invalid priority: {level} (use H0, 1, 2, 3, or clear)", err=True)
-        sys.exit(1)
+        _die(f"Invalid priority: {level} (use H0, 1, 2, 3, or clear)")
 
     index = do_priority(index, sid, level)
     _update_legacy_priority(repo_key_arg, sid, level)
@@ -929,8 +930,7 @@ def index_delete(repo_key_arg: str, session_id: str) -> None:
     from .indexer import delete_session, load_index, save_index, write_legacy_tsv
     index = load_index(repo_key_arg)
     if session_id not in index:
-        click.echo(f"  Session {session_id[:8]} not found", err=True)
-        sys.exit(1)
+        _die(f"  Session {session_id[:8]} not found")
     index = delete_session(index, session_id)
     save_index(repo_key_arg, index)
     write_legacy_tsv(repo_key_arg, index)
@@ -1087,22 +1087,18 @@ def search_cmd(query: str, profile: str, repo_label: str, limit: int, as_json: b
     try:
         result = subprocess.run(cmd, input=prompt, env=env, capture_output=True, text=True, timeout=60)
     except FileNotFoundError:
-        click.echo("claude not found on PATH.", err=True)
-        sys.exit(1)
+        _die("claude not found on PATH.")
     except subprocess.TimeoutExpired:
-        click.echo("Search timed out.", err=True)
-        sys.exit(1)
+        _die("Search timed out.")
 
     if result.returncode != 0:
-        click.echo(f"Search failed:\n{result.stderr or result.stdout}", err=True)
-        sys.exit(1)
+        _die(f"Search failed:\n{result.stderr or result.stdout}")
 
     # Extract JSON from the response (Claude may wrap it in prose)
     output = result.stdout.strip()
     m = re.search(r'\{.*?"matches".*?\}', output, re.DOTALL)
     if not m:
-        click.echo(f"Could not parse response:\n{output}", err=True)
-        sys.exit(1)
+        _die(f"Could not parse response:\n{output}")
 
     data = json.loads(m.group())
     matched_ids: list[str] = data.get("matches", [])
@@ -1215,20 +1211,14 @@ def jump_cmd(repo_label: str, lead: bool, dry_run: bool) -> None:
     Example:  ts jump textsessions --lead
     """
     config = load()
-    if not config.repos:
-        click.echo("No repos configured. Run: textsessions init", err=True)
-        sys.exit(1)
+    _require_repos(config)
 
     # Preserve the user's typed shorthand for the tmux window name — `ts jump
     # proxy` should rename the pane to "proxy" even though it resolves to
     # `textproxy`. When no arg is given, fall back to the resolved repo label.
     user_typed_label = repo_label
     if repo_label:
-        match = _resolve_repo_label(config, repo_label)
-        if not match:
-            available = ", ".join(r.label for r in config.repos) or "(none)"
-            raise click.UsageError(f"No repo with label '{repo_label}'. Available: {available}")
-        repo_label = match.label
+        repo_label = _resolve_repo_label(config, repo_label, strict=True).label
     else:
         repo_label = _resolve_repo_from_cwd(config).label
     window_label = user_typed_label or repo_label
@@ -1559,8 +1549,7 @@ def sessions_index_compat(args: tuple[str, ...]) -> None:
 
     argv = list(args)
     if len(argv) < 2:
-        click.echo("Usage: claude-sessions-index <command> <repo-key> [args...]", err=True)
-        sys.exit(1)
+        _die("Usage: claude-sessions-index <command> <repo-key> [args...]")
 
     cmd = argv[0]
     rkey = argv[1]
@@ -1608,8 +1597,7 @@ def sessions_index_compat(args: tuple[str, ...]) -> None:
 
     elif cmd == "tag":
         if len(rest) < 2:
-            click.echo("Usage: claude-sessions-index tag <repo-key> <session-prefix> <tag1,tag2>", err=True)
-            sys.exit(1)
+            _die("Usage: claude-sessions-index tag <repo-key> <session-prefix> <tag1,tag2>")
         index = load_index(rkey)
         sid = resolve_session_id(index, rest[0])
         index = do_tag(index, sid, rest[1])
@@ -1618,8 +1606,7 @@ def sessions_index_compat(args: tuple[str, ...]) -> None:
 
     elif cmd == "untag":
         if len(rest) < 2:
-            click.echo("Usage: claude-sessions-index untag <repo-key> <session-prefix> <tag1,tag2>", err=True)
-            sys.exit(1)
+            _die("Usage: claude-sessions-index untag <repo-key> <session-prefix> <tag1,tag2>")
         index = load_index(rkey)
         sid = resolve_session_id(index, rest[0])
         index = do_untag(index, sid, rest[1])
@@ -1629,8 +1616,7 @@ def sessions_index_compat(args: tuple[str, ...]) -> None:
 
     elif cmd == "rename":
         if len(rest) < 2:
-            click.echo("Usage: claude-sessions-index rename <repo-key> <session-prefix> <new title>", err=True)
-            sys.exit(1)
+            _die("Usage: claude-sessions-index rename <repo-key> <session-prefix> <new title>")
         index = load_index(rkey)
         sid = resolve_session_id(index, rest[0])
         new_title = " ".join(rest[1:])
@@ -1650,8 +1636,7 @@ def sessions_index_compat(args: tuple[str, ...]) -> None:
 
     elif cmd == "priority":
         if not rest:
-            click.echo("Usage: claude-sessions-index priority <repo-key> <session-prefix> [H0|1|2|3|clear]", err=True)
-            sys.exit(1)
+            _die("Usage: claude-sessions-index priority <repo-key> <session-prefix> [H0|1|2|3|clear]")
         index = load_index(rkey)
         sid = resolve_session_id(index, rest[0])
         level = rest[1] if len(rest) > 1 else ""
@@ -1662,8 +1647,7 @@ def sessions_index_compat(args: tuple[str, ...]) -> None:
             click.echo(f"  {sid[:8]}  {badge}  {entry['slug']}")
         else:
             if level not in ("H0", "1", "2", "3", "clear"):
-                click.echo(f"Invalid priority: {level}", err=True)
-                sys.exit(1)
+                _die(f"Invalid priority: {level}")
             index = do_priority(index, sid, level)
             _update_legacy_priority(rkey, sid, level)
             save_index(rkey, index)
@@ -1674,5 +1658,4 @@ def sessions_index_compat(args: tuple[str, ...]) -> None:
                 click.echo(f"  {sid[:8]}  {badge}  {entry['slug']}")
 
     else:
-        click.echo(f"Unknown command: {cmd}", err=True)
-        sys.exit(1)
+        _die(f"Unknown command: {cmd}")

@@ -230,6 +230,18 @@ def _migrate_legacy_priorities(repo_key: str, index: dict) -> None:
                 index[sid]["priority"] = pri
 
 
+def _carry_forward(old: dict, new: dict, fields: tuple[str, ...]) -> None:
+    """Copy any *fields* from *old* into *new* when the old value is truthy.
+
+    Lets ``build_index`` preserve user-set metadata (priority, tags, pinned,
+    archived, name, description, lineage, hint) across rebuilds without
+    repeating the same ``if old.get(f): new[f] = old[f]`` block.
+    """
+    for field in fields:
+        if old.get(field):
+            new[field] = old[field]
+
+
 def build_index(repo_key: str, pairs: list[str]) -> dict:
     """Rebuild YAML index from .jsonl files, preserving user-set fields."""
     from .hints import read_hint
@@ -274,9 +286,7 @@ def build_index(repo_key: str, pairs: list[str]) -> dict:
             entry["description"] = ct  # auto-set from custom_title; user-set description takes precedence below
 
         # Preserve user-set metadata from previous index
-        for field in ("priority", "tags", "pinned", "archived"):
-            if old.get(field):
-                entry[field] = old[field]
+        _carry_forward(old, entry, ("priority", "tags", "pinned", "archived"))
 
         # name/description: custom_title from .jsonl is authoritative (it's what
         # Claude or `textsessions rename` last set). Only fall back to old values
@@ -285,9 +295,7 @@ def build_index(repo_key: str, pairs: list[str]) -> dict:
             entry["name"] = make_short_name(ct) or sid[:5]
             entry["description"] = ct
         else:
-            for field in ("name", "description"):
-                if old.get(field):
-                    entry[field] = old[field]
+            _carry_forward(old, entry, ("name", "description"))
 
         # Shallow-clone lineage: store only when the profile is a shallow clone.
         # If textaccounts no longer has the profile (GCd), preserve the last
@@ -300,8 +308,8 @@ def build_index(repo_key: str, pairs: list[str]) -> dict:
                 "ephemeral": bool(lineage.get("ephemeral", False)),
                 "owner": lineage.get("owner") or "",
             }
-        elif old.get("lineage"):
-            entry["lineage"] = old["lineage"]
+        else:
+            _carry_forward(old, entry, ("lineage",))
 
         # Session hints (spec-textsessions-hints v0.1.0): annotation files at
         # ~/.cache/textsessions/hints/<sid>.yaml written by external producers
@@ -312,8 +320,8 @@ def build_index(repo_key: str, pairs: list[str]) -> dict:
         hint_obj = Hint.from_dict(hint_data) if hint_data else None
         if hint_obj is not None:
             entry["hint"] = hint_obj.to_dict()
-        elif old.get("hint"):
-            entry["hint"] = old["hint"]
+        else:
+            _carry_forward(old, entry, ("hint",))
 
         new_index[sid] = entry
 
