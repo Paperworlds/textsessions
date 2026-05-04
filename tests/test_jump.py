@@ -165,6 +165,29 @@ def test_jump_no_repos_configured():
 
 # --- CWD fallback -----------------------------------------------------------
 
+def test_jump_resolves_text_prefix_sugar():
+    """`ts jump proxy` should resolve to repo labelled `textproxy`."""
+    cfg = Config(repos=[
+        RepoConfig(path=Path("/p/textproxy"), label="textproxy", profile="personal"),
+    ])
+    s = _s(name="proxy-sess", repo_label="textproxy", repo_path=Path("/p/textproxy"))
+    result, _ = _invoke(["proxy"], [s], cfg=cfg)
+    assert result.exit_code == 0
+    assert "resuming proxy-sess" in (result.output + result.stderr)
+
+
+def test_jump_exact_match_wins_over_sugar():
+    """If a repo literally named 'proxy' exists, sugar shouldn't override it."""
+    cfg = Config(repos=[
+        RepoConfig(path=Path("/p/textproxy"), label="textproxy", profile="x"),
+        RepoConfig(path=Path("/p/proxy"), label="proxy", profile="x"),
+    ])
+    a = _s(name="text-one", repo_label="textproxy", repo_path=Path("/p/textproxy"))
+    b = _s(name="plain-one", repo_label="proxy", repo_path=Path("/p/proxy"))
+    result, _ = _invoke(["proxy"], [a, b], cfg=cfg)
+    assert "resuming plain-one" in (result.output + result.stderr)
+
+
 def test_jump_no_arg_uses_cwd():
     """No positional repo → falls back to _resolve_repo_from_cwd."""
     cfg = _cfg()

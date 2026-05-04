@@ -35,6 +35,25 @@ except Exception:
     _version_str = __version__
 
 
+def _resolve_repo_label(config, label: str) -> RepoConfig | None:
+    """Match a repo label tolerantly: exact, then with 'text' prefix.
+
+    Lets users type ``ts jump proxy`` and have it resolve to ``textproxy``,
+    matching the paperworlds 'text*' naming convention. Returns None if
+    nothing matches; caller produces the error.
+    """
+    if not label:
+        return None
+    for r in config.repos:
+        if r.label == label:
+            return r
+    sugar = f"text{label}"
+    for r in config.repos:
+        if r.label == sugar:
+            return r
+    return None
+
+
 def _resume_session(s, config, *, dry_run: bool = False) -> int:
     """Resume *s* by exec'ing `claude --resume`. Returns the child's exit code.
 
@@ -174,6 +193,11 @@ def new_cmd(repo_label: str, profile: str, name: str, priority: str | None, mode
         matched_repos = [r for r in config.repos
                          if r.label == repo_label
                          or r.label.startswith(repo_label + "/")]
+        if not matched_repos:
+            # Fall back to the 'text<label>' shortcut for paperworlds repos.
+            sugared = _resolve_repo_label(config, repo_label)
+            if sugared:
+                matched_repos = [sugared]
         if not matched_repos:
             labels = ", ".join(r.label for r in config.repos)
             click.echo(f"No repo matching '{repo_label}'. Available: {labels}", err=True)
@@ -1193,10 +1217,11 @@ def jump_cmd(repo_label: str, lead: bool, dry_run: bool) -> None:
         sys.exit(1)
 
     if repo_label:
-        matches = [r for r in config.repos if r.label == repo_label]
-        if not matches:
+        match = _resolve_repo_label(config, repo_label)
+        if not match:
             available = ", ".join(r.label for r in config.repos) or "(none)"
             raise click.UsageError(f"No repo with label '{repo_label}'. Available: {available}")
+        repo_label = match.label
     else:
         repo_label = _resolve_repo_from_cwd(config).label
 

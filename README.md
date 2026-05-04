@@ -174,6 +174,7 @@ Resume the latest (or lead) session in a repo with one keystroke. From inside a 
 ```sh
 textsessions jump                       # resume the latest interactive session in the CWD repo
 textsessions jump textsessions          # explicit repo label
+textsessions jump proxy                 # short form: resolves to `textproxy` (paperworlds 'text*' sugar)
 textsessions jump textsessions --lead   # pinned (or `lead`-labelled) session instead of latest
 textsessions jump --dry-run             # print what would resume, don't exec
 ```
