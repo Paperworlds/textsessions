@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.12.6
+
+- refactor: helpers for repeated CLI + indexer patterns
+
 ## v0.8.8
 
 - `feat(repo)`: add `ts repo rename` for label-only changes (no filesystem move)
