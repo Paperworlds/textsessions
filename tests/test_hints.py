@@ -110,17 +110,36 @@ def test_session_persona_from_hint():
 
 def test_session_persona_chip_persona_only():
     s = _s(hint=Hint(persona="agentic-pivot"))
-    assert s.persona_chip == "[persona=agentic-pivot]"
+    # Brackets are escaped (`\[…]`) so Rich/Textual treat them as literal,
+    # not as a markup tag. Critical when labels contain '-' or '#'.
+    assert s.persona_chip == r"\[persona=agentic-pivot]"
 
 
 def test_session_persona_chip_with_labels():
     s = _s(hint=Hint(persona="agentic-pivot", labels=["pivot", "private"]))
-    assert s.persona_chip == "[persona=agentic-pivot, #pivot #private]"
+    assert s.persona_chip == r"\[persona=agentic-pivot, #pivot #private]"
 
 
 def test_session_persona_chip_labels_only():
     s = _s(hint=Hint(labels=["wip"]))
-    assert s.persona_chip == "[#wip]"
+    assert s.persona_chip == r"\[#wip]"
+
+
+def test_persona_chip_renders_safely_through_rich():
+    """Regression: persona_chip with hyphenated labels must not crash Rich's markup parser.
+
+    Caught a TUI crash on 2026-05-03: rendering `[persona=foo, #pivot #private]` inside
+    `[magenta]…[/magenta]` raised MarkupError because Rich saw `[persona=...]` as a tag.
+    """
+    from rich.console import Console
+    from rich.text import Text
+    s = _s(hint=Hint(persona="agentic-pivot", labels=["pivot", "private"]))
+    # Wrap the chip in a styled markup span — exactly what tui/app.py does.
+    markup = f"[magenta]{s.persona_chip}[/magenta]"
+    # Should not raise.
+    Text.from_markup(markup)
+    # And the chip should round-trip plain (no leftover tags).
+    assert "persona=agentic-pivot" in Text.from_markup(markup).plain
 
 
 def test_session_persona_chip_empty_when_no_hint():

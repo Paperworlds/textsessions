@@ -64,17 +64,17 @@ def test_session_from_index_entry_with_lineage():
     }
     s = Session.from_index_entry("sid1", entry, "repo", Path("/tmp"))
     assert s.is_shallow is True
-    assert s.lineage_chip == "[shallow ← personal, ephemeral, owner=pp:run-1]"
+    assert s.lineage_chip == r"\[shallow ← personal, ephemeral, owner=pp:run-1]"
 
 
 def test_lineage_chip_non_ephemeral():
     s = _s(lineage=Lineage(parent="personal", ephemeral=False, owner=""))
-    assert s.lineage_chip == "[shallow ← personal]"
+    assert s.lineage_chip == r"\[shallow ← personal]"
 
 
 def test_lineage_chip_ephemeral_no_owner():
     s = _s(lineage=Lineage(parent="work", ephemeral=True, owner=""))
-    assert s.lineage_chip == "[shallow ← work, ephemeral]"
+    assert s.lineage_chip == r"\[shallow ← work, ephemeral]"
 
 
 # --- filter_sessions new options -------------------------------------------

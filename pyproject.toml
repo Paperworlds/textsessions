@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "textsessions"
-version = "0.12.4"
+version = "0.12.5"
 description = "A Textual TUI for managing Claude Code sessions"
 readme = "README.md"
 requires-python = ">=3.13"

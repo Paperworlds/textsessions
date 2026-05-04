@@ -197,12 +197,17 @@ class Session:
 
     @property
     def persona_chip(self) -> str:
-        """Short display string for persona/labels. Empty when nothing to show.
+        r"""Short display string for persona/labels. Empty when nothing to show.
 
-        Examples:
-          [persona=agentic-pivot]
-          [persona=agentic-pivot, #pivot #private]
-          [#wip]
+        Returns markup-safe text: literal brackets are escaped (``\[…\]``)
+        so the chip can be rendered through Rich/Textual without triggering
+        the markup parser. ``#`` is kept verbatim — it is not special in
+        Rich markup.
+
+        Examples (raw values, escaped brackets):
+          \[persona=agentic-pivot]
+          \[persona=agentic-pivot, #pivot #private]
+          \[#wip]
         """
         if not self.hint:
             return ""
@@ -211,15 +216,17 @@ class Session:
             parts.append(f"persona={self.hint.persona}")
         if self.hint.labels:
             parts.append(" ".join(f"#{label}" for label in self.hint.labels))
-        return f"[{', '.join(parts)}]" if parts else ""
+        return rf"\[{', '.join(parts)}]" if parts else ""
 
     @property
     def lineage_chip(self) -> str:
-        """Short display string for shallow lineage. Empty for non-shallow sessions.
+        r"""Short display string for shallow lineage. Empty for non-shallow sessions.
 
-        Examples:
-          [shallow ← personal]
-          [shallow ← work, ephemeral, owner=textprompts:run-42]
+        Returns markup-safe text — see ``persona_chip`` for the rationale.
+
+        Examples (raw values, escaped brackets):
+          \[shallow ← personal]
+          \[shallow ← work, ephemeral, owner=textprompts:run-42]
         """
         if not self.lineage:
             return ""
@@ -229,7 +236,7 @@ class Session:
             if self.lineage.owner:
                 ep += f", owner={self.lineage.owner}"
             parts.append(ep)
-        return f"[{', '.join(parts)}]"
+        return rf"\[{', '.join(parts)}]"
 
 
 def _load_yaml_index(yaml_path: Path) -> dict:
