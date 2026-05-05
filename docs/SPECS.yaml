@@ -5,6 +5,11 @@ owns:
     consumers:
       - textprompts
 
+  - slug: textsessions-checkpoint
+    version: 0.1.0
+    spec_path: docs/specs/textsessions-checkpoint.md
+    consumers: []
+
 follows:
   - slug: textaccounts-api-v0-2
     pinned_version: "0.2.0"
