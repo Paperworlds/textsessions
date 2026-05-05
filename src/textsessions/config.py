@@ -51,6 +51,7 @@ class Config:
     proxy: ProxyConfig = field(default_factory=ProxyConfig)
     integrations: IntegrationsConfig = field(default_factory=IntegrationsConfig)
     ui: UiConfig = field(default_factory=UiConfig)
+    checkpoint_log: bool = False
 
 
 def load() -> Config:
@@ -90,7 +91,13 @@ def load() -> Config:
     ui = UiConfig(
         startup_repo=ui_data.get("startup_repo", "current"),
     )
-    return Config(repos=repos, proxy=proxy, integrations=integrations, ui=ui)
+    return Config(
+        repos=repos,
+        proxy=proxy,
+        integrations=integrations,
+        ui=ui,
+        checkpoint_log=bool(data.get("checkpoint_log", False)),
+    )
 
 
 def save(config: Config) -> None:
@@ -116,6 +123,7 @@ def save(config: Config) -> None:
         "ui": {
             "startup_repo": config.ui.startup_repo,
         },
+        "checkpoint_log": config.checkpoint_log,
     }
     with open(CONFIG_PATH, "wb") as f:
         tomli_w.dump(data, f)

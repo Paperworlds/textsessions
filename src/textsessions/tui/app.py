@@ -105,6 +105,8 @@ class SessionDetail(Static):
             lines.append(f"[bold]Lineage:[/bold] [cyan]{s.lineage_chip}[/cyan]")
         if s.persona or s.labels:
             lines.append(f"[bold]Persona:[/bold] [magenta]{s.persona_chip}[/magenta]")
+        if s.has_checkpoint_log:
+            lines.append("[bold]Checkpoint:[/bold] [green]log present[/green]")
         lines += [
             "",
             f"[bold]{detail_label}[/bold]    [dim]{detail_display}[/dim]",
@@ -306,7 +308,8 @@ class TextSessionsApp(ActionsMixin, App):
             tags_str = "  " + " ".join(f"[cyan]#{t}[/cyan]" for t in tags) if tags else ""
             shallow_str = f" [cyan]{s.lineage_chip}[/cyan]" if s.is_shallow else ""
             persona_str = f" [magenta]{s.persona_chip}[/magenta]" if (s.persona or s.labels) else ""
-            profile_cell = f"{s.profile}{tags_str}{shallow_str}{persona_str}"
+            checkpoint_str = " [green][c][/green]" if s.has_checkpoint_log else ""
+            profile_cell = f"{s.profile}{tags_str}{shallow_str}{persona_str}{checkpoint_str}"
             row = [name_cell]
             if not single_repo:
                 row.append(s.repo_label[:15])

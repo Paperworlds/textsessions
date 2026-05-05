@@ -143,6 +143,12 @@ class Session:
         return f"P{self.priority}"
 
     @property
+    def has_checkpoint_log(self) -> bool:
+        """A checkpoint log file exists for this session."""
+        from .checkpoint import has_checkpoint_log as _has
+        return _has(self.id)
+
+    @property
     def is_ghost(self) -> bool:
         """Repo directory no longer exists on disk."""
         return not (self.repo_path / ".git").exists()

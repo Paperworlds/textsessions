@@ -103,12 +103,23 @@ def _resume_session(s, config, *, dry_run: bool = False, window_label: str = "")
         "textaccounts": config.integrations.textaccounts,
         "textproxy": config.integrations.textproxy,
     })
-    cmd = resume_cmd(s.id, s.name, s.profile, env, window_label=window_label)
+
+    log_path = None
+    if config.checkpoint_log:
+        from .checkpoint import checkpoint_log_path, write_checkpoint_header, write_checkpoint_trailer
+        log_path = checkpoint_log_path(s.id)
+        write_checkpoint_header(log_path, s)
+        env["TS_CHECKPOINT_LOG"] = str(log_path)
+
+    cmd = resume_cmd(s.id, s.name, s.profile, env, window_label=window_label, checkpoint_log_path=log_path)
     click.echo(f"→ resuming {s.name} [{s.id[:8]}] in {s.repo_label}", err=True)
     if dry_run:
         click.echo(f"  (dry-run) would exec: {' '.join(cmd)}", err=True)
         return 0
-    return subprocess.run(cmd, env=env, cwd=cwd).returncode
+    result = subprocess.run(cmd, env=env, cwd=cwd)
+    if log_path is not None:
+        write_checkpoint_trailer(log_path, result.returncode)
+    return result.returncode
 
 
 def _resolve_repo_from_cwd(config, *, add_hint: str = "Run: textsessions add .") -> RepoConfig:

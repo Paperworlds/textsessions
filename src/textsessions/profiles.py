@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import shutil
+from pathlib import Path
 import socket
 
 # --- textaccounts integration (optional dependency) --------------------------
@@ -144,6 +145,7 @@ def resume_cmd(
     env: dict[str, str],
     *,
     window_label: str = "",
+    checkpoint_log_path: "Path | None" = None,
 ) -> list[str]:
     """Return the argv list to resume a Claude session.
 
@@ -159,6 +161,10 @@ def resume_cmd(
     import shlex
 
     claude_cmd = f"claude --resume {shlex.quote(session_id)}"
+
+    if checkpoint_log_path is not None:
+        from .checkpoint import CHECKPOINT_SYSTEM_PROMPT
+        claude_cmd += f" --append-system-prompt {shlex.quote(CHECKPOINT_SYSTEM_PROMPT)}"
 
     if os.environ.get("TMUX"):
         if window_label:
