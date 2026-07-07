@@ -255,6 +255,13 @@ class ActionsMixin:
         self.push_screen(HelpModal())
 
     def action_resume_session(self) -> None:
+        self._resume_current(no_proxy=False)
+
+    def action_resume_session_no_proxy(self) -> None:
+        """Resume direct-to-Anthropic (bypass textproxy) — needed for Remote Control."""
+        self._resume_current(no_proxy=True)
+
+    def _resume_current(self, *, no_proxy: bool) -> None:
         s = self._current_session()
         if not s:
             return
@@ -263,12 +270,14 @@ class ActionsMixin:
         env = build_launch_env(profile, {
             "textaccounts": self._config.integrations.textaccounts,
             "textproxy": self._config.integrations.textproxy,
-        })
+        }, force_no_proxy=no_proxy)
         cmd = resume_cmd(resume_id, s.name, profile, env)
         cwd = s.repo_path
         if not cwd.exists():
             self.notify(f"Repo path missing: {cwd} — use 'textsessions repo move' to fix", severity="error")
             return
+        if no_proxy:
+            self.notify("Resuming direct — no proxy (Remote Control enabled)", severity="information")
         with self.suspend():
             result = subprocess.run(cmd, env=env, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, cwd=cwd)
         if result.returncode != 0:

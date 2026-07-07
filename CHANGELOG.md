@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+- feat: `--no-proxy` on `ts new` and `ts jump`, plus TUI `R` (resume direct) — launch a session direct-to-Anthropic, bypassing textproxy. Required for Claude Code Remote Control and any feature Anthropic gates behind a non-Anthropic `ANTHROPIC_BASE_URL`.
+- feat: `build_launch_env(force_no_proxy=True)` now actively strips an inherited `ANTHROPIC_BASE_URL` (previously, disabling textproxy only skipped setting it)
+
 ## v0.14.1
 
 - fix: `write_git_profile_gitconfig` always writes explicit `[commit] gpgsign = true` and `[tag] gpgsign = true` — no longer relies on inheritance from `~/.gitconfig`

@@ -198,6 +198,7 @@ class TextSessionsApp(ActionsMixin, App):
         Binding("r", "rename_session", "Rename", show=False),
         Binding("d", "archive_session", "Archive", show=False),
         Binding("D", "delete_session_direct", "Delete", show=False),
+        Binding("R", "resume_session_no_proxy", "Resume direct", show=False),
         Binding("x", "pin_session", "Pin", show=False),
         Binding("y", "toggle_pins", "Pins", show=False),
         Binding("a", "toggle_all", "All", show=False),

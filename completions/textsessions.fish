@@ -34,6 +34,8 @@ complete -c textsessions -f -n "__fish_use_subcommand" -a "search"         -d "S
 complete -c textsessions -f -n "__fish_use_subcommand" -a "tree"           -d "Dump repos and sessions as YAML/JSON tree"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "shallow"        -d "Manage shallow-clone profiles (delegates to textaccounts)"
 complete -c textsessions -f -n "__fish_use_subcommand" -a "jump"           -d "Resume the latest (or lead) session in a repo"
+complete -c textsessions -f -n "__fish_use_subcommand" -a "repos"          -d "Print all known repos"
+complete -c textsessions -f -n "__fish_use_subcommand" -a "repo"           -d "Manage configured repos"
 
 # jump: positional repo label + flags
 complete -c textsessions -n "__fish_seen_subcommand_from jump; and not __fish_seen_subcommand_from --lead --dry-run" \

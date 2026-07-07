@@ -73,7 +73,7 @@ def _resolve_repo_label(config, label: str, *, strict: bool = False) -> RepoConf
     return None
 
 
-def _resume_session(s, config, *, dry_run: bool = False, window_label: str = "") -> int:
+def _resume_session(s, config, *, dry_run: bool = False, window_label: str = "", no_proxy: bool = False) -> int:
     """Resume *s* by exec'ing `claude --resume`. Returns the child's exit code.
 
     Centralises the launch path used by `ts sessions --resume`, `ts jump`,
@@ -84,6 +84,9 @@ def _resume_session(s, config, *, dry_run: bool = False, window_label: str = "")
 
     *window_label*: optional override for the tmux window name (forwarded
     to ``resume_cmd``). Empty falls back to the session-name-derived default.
+
+    *no_proxy*: when True, launch direct-to-Anthropic (no textproxy base URL),
+    which is required for features like Claude Code Remote Control.
 
     With ``dry_run=True`` the command is printed but not executed; the
     return value is 0.
@@ -102,7 +105,7 @@ def _resume_session(s, config, *, dry_run: bool = False, window_label: str = "")
     env = build_launch_env(s.profile, {
         "textaccounts": config.integrations.textaccounts,
         "textproxy": config.integrations.textproxy,
-    })
+    }, force_no_proxy=no_proxy)
 
     log_path = None
     if config.checkpoint_log:
@@ -112,7 +115,8 @@ def _resume_session(s, config, *, dry_run: bool = False, window_label: str = "")
         env["TS_CHECKPOINT_LOG"] = str(log_path)
 
     cmd = resume_cmd(s.id, s.name, s.profile, env, window_label=window_label, checkpoint_log_path=log_path)
-    click.echo(f"→ resuming {s.name} [{s.id[:8]}] in {s.repo_label}", err=True)
+    proxy_note = " (direct — no proxy)" if no_proxy else ""
+    click.echo(f"→ resuming {s.name} [{s.id[:8]}] in {s.repo_label}{proxy_note}", err=True)
     if dry_run:
         if log_path is not None:
             click.echo(f"  (dry-run) env: TS_CHECKPOINT_LOG={log_path}", err=True)
@@ -220,7 +224,9 @@ def _complete_profiles(ctx: click.Context, param: click.Parameter, incomplete: s
 @click.option("--git-profile", "-g", "git_profile_name", default="",
               shell_complete=_complete_git_profiles,
               help="Git identity to use for commits (overrides profile default).")
-def new_cmd(repo_label: str, profile: str, name: str, priority: str | None, model: str, git_profile_name: str) -> None:
+@click.option("--no-proxy", "no_proxy", is_flag=True,
+              help="Launch direct-to-Anthropic (bypass textproxy). Required for Remote Control.")
+def new_cmd(repo_label: str, profile: str, name: str, priority: str | None, model: str, git_profile_name: str, no_proxy: bool) -> None:
     """Launch a new Claude Code session in a configured repo."""
 
     from .config import detect_claude_dirs
@@ -278,7 +284,7 @@ def new_cmd(repo_label: str, profile: str, name: str, priority: str | None, mode
     env = build_launch_env(profile, {
         "textaccounts": config.integrations.textaccounts,
         "textproxy": config.integrations.textproxy,
-    }, git_profile=resolved_git_profile)
+    }, git_profile=resolved_git_profile, force_no_proxy=no_proxy)
     fish_parts = ["claude"]
     if name:
         fish_parts += ["--name", shlex.quote(name)]
@@ -1248,7 +1254,9 @@ def repos_cmd() -> None:
               help="Pick a pinned or 'lead'-labelled session instead of the latest.")
 @click.option("--dry-run", is_flag=True,
               help="Print what would be resumed and exit 0.")
-def jump_cmd(repo_label: str, lead: bool, dry_run: bool) -> None:
+@click.option("--no-proxy", "no_proxy", is_flag=True,
+              help="Launch direct-to-Anthropic (bypass textproxy). Required for Remote Control.")
+def jump_cmd(repo_label: str, lead: bool, dry_run: bool, no_proxy: bool) -> None:
     """Resume the latest (or lead) session in a repo with one keystroke.
 
     Without an argument, resolves the repo from the current working directory.
@@ -1308,7 +1316,7 @@ def jump_cmd(repo_label: str, lead: bool, dry_run: bool) -> None:
         )
         sys.exit(1)
 
-    sys.exit(_resume_session(eligible[0], config, dry_run=dry_run, window_label=window_label))
+    sys.exit(_resume_session(eligible[0], config, dry_run=dry_run, window_label=window_label, no_proxy=no_proxy))
 
 
 @main.group("shallow")
@@ -1468,6 +1476,100 @@ def repo_rename(old_label: str, new_label: str) -> None:
     matches[0].label = new_label
     save(config)
     click.echo(f"Done  '{old_label}' → '{new_label}'")
+
+
+# ---------------------------------------------------------------------------
+# Migrate command
+# ---------------------------------------------------------------------------
+
+@main.command("migrate")
+@click.argument("name", shell_complete=_complete_session_names)
+@click.option("--to", "target_profile", required=True, shell_complete=_complete_profiles,
+              metavar="PROFILE", help="textaccounts profile to copy the session into.")
+@click.option("--dry-run", is_flag=True, help="Print what would happen without copying files.")
+def migrate_cmd(name: str, target_profile: str, dry_run: bool) -> None:
+    """Copy a session JSONL to a different profile's Claude config directory.
+
+    The session transcript (.jsonl) is copied into the target profile's
+    projects directory so it can be resumed there.  The source is left intact —
+    this is a copy, not a move.
+
+    After migration, resume in the target profile with:
+
+    \b
+      eval (textaccounts show <profile>)
+      claude --resume <session-id>
+    """
+    from .config import detect_claude_dirs
+    from .indexer import load_index, reindex_repos
+    from .profiles import env_for_profile, validate_explicit_profile
+
+    config = load()
+    _require_repos(config)
+
+    validate_explicit_profile(target_profile)
+
+    target_env = env_for_profile(target_profile)
+    if not target_env or "CLAUDE_CONFIG_DIR" not in target_env:
+        _die(
+            f"Profile '{target_profile}' has no CLAUDE_CONFIG_DIR.\n"
+            f"  Fix: textaccounts adopt {target_profile} <path-to-config-dir>"
+        )
+
+    target_claude_dir = Path(target_env["CLAUDE_CONFIG_DIR"])
+
+    s = _resolve_session_by_name(name, config)
+
+    rk = repo_key(s.repo_path)
+    index = load_index(rk)
+    entry = index.get(s.id, {})
+    jsonl_path_str = entry.get("jsonl_path")
+
+    src: Path | None = None
+    if jsonl_path_str and Path(jsonl_path_str).exists():
+        src = Path(jsonl_path_str)
+    else:
+        for claude_dir in detect_claude_dirs():
+            candidate = claude_dir / "projects" / rk / f"{s.id}.jsonl"
+            if candidate.exists():
+                src = candidate
+                break
+
+    if src is None:
+        _die(
+            f"Cannot locate .jsonl file for session '{s.name}' [{s.id[:8]}].\n"
+            f"  Try running: textsessions reindex"
+        )
+
+    dest_dir = target_claude_dir / "projects" / rk
+    dest = dest_dir / f"{s.id}.jsonl"
+
+    console = Console()
+    console.print(f"  session   [bold]{s.name}[/bold]  [{s.id[:8]}]  [{s.profile}]")
+    console.print(f"  from      [dim]{src}[/dim]")
+    console.print(f"  to        [dim]{dest}[/dim]")
+
+    if dest.exists():
+        console.print("  [yellow]note[/yellow]  target already has this session — will overwrite")
+
+    if dry_run:
+        console.print("  [dim](dry-run) no files copied[/dim]")
+        return
+
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(str(src), str(dest))
+    console.print(f"  [green]✓[/green]  copied {src.name}")
+
+    repo_cfg = next((r for r in config.repos if r.path == s.repo_path), None)
+    if repo_cfg:
+        claude_dirs = detect_claude_dirs()
+        reindex_repos([repo_cfg], claude_dirs, all_repos=config.repos)
+        console.print("  [green]✓[/green]  reindexed")
+
+    console.print()
+    console.print(f"Resume in [bold]{target_profile}[/bold]:")
+    console.print(f"  eval (textaccounts show {target_profile})")
+    console.print(f"  claude --resume {s.id}")
 
 
 # ---------------------------------------------------------------------------

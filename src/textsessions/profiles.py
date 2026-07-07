@@ -227,6 +227,8 @@ def build_launch_env(
     profile: str,
     integrations_enabled: dict[str, bool],
     git_profile: "GitProfile | None" = None,
+    *,
+    force_no_proxy: bool = False,
 ) -> dict[str, str]:
     """Build subprocess env dict with integrations applied.
 
@@ -236,6 +238,13 @@ def build_launch_env(
 
     git_profile, when given, writes a per-identity gitconfig and sets
     GIT_CONFIG_GLOBAL, overriding whatever textaccounts may have injected.
+
+    force_no_proxy, when True, guarantees a direct-to-Anthropic session: the
+    textproxy URL is never injected and any ANTHROPIC_BASE_URL inherited from
+    the parent shell is stripped. Use for launches that need features Anthropic
+    disables behind a non-Anthropic base URL (e.g. Claude Code Remote Control).
+    Note this differs from merely disabling the textproxy integration, which
+    only skips *setting* the URL and leaves an inherited one in place.
     """
     env = os.environ.copy()
 
@@ -249,7 +258,10 @@ def build_launch_env(
             except ValueError:
                 pass  # profile not found in textaccounts — fall through to tier 2/3
 
-    if integrations_enabled.get("textproxy", True) and not is_token_profile:
+    if force_no_proxy:
+        # Direct-to-Anthropic override — drop any inherited or injected base URL.
+        env.pop("ANTHROPIC_BASE_URL", None)
+    elif integrations_enabled.get("textproxy", True) and not is_token_profile:
         if textproxy_running():
             env["ANTHROPIC_BASE_URL"] = textproxy_url(profile)
         else:

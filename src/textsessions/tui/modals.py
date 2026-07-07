@@ -214,6 +214,7 @@ class HelpModal(ModalScreen[None]):
 
     HELP_ROWS = [
         ("enter / click", "Resume session"),
+        ("R",             "Resume direct (no proxy — Remote Control)"),
         ("n",             "New session"),
         ("r",             "Rename session"),
         ("t",             "Tag session"),
