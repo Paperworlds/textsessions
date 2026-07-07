@@ -1,0 +1,7 @@
+Done. Here's what was implemented:
+
+- **`y` binding** toggles `_show_pinned` reactive (default `True`)
+- **`_apply_filter`** excludes pinned sessions when `_show_pinned` is `False`
+- **Scope label** shows `[dim red]pins hidden[/dim red]` via `_update_scope_label()`, triggered by watchers on both `_repo_filter` and `_show_pinned`
+- **Toast notification** on toggle: "Pinned sessions visible/hidden"
+- **Help modal** updated with the `y` → "Toggle pinned visibility" entry

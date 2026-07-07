@@ -1,0 +1,11 @@
+Done. All 7 actions now have error handling:
+
+- **`action_resume_session`** — checks `returncode != 0`, shows `"Resume failed (exit N)"` toast
+- **`action_new_session`** — same for the `claude` launch subprocess
+- **`action_tag_session`** — try/except around index mutations; success: `"Tagged"`, error: `"Tag failed: ..."`
+- **`action_priority_session`** — `"Priority set"` / `"Priority failed: ..."`
+- **`action_rename_session`** — `"Renamed"` / `"Rename failed: ..."`
+- **`action_archive_session`** — `"Archived"` / `"Archive failed: ..."` and `"Deleted"` / `"Delete failed: ..."` for the two branches
+- **`action_delete_session_direct`** — `"Deleted"` / `"Delete failed: ..."`
+
+86 tests pass, committed and pushed as `a827f26`.

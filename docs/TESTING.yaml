@@ -1,0 +1,267 @@
+# Smoke tests for textsessions
+#
+# Integration-boundary tests that unit tests can't fully cover without faking
+# the world. Grouped by theme. Run by hand after changes to the relevant
+# subsystem.
+#
+# Owner: textsessions. Update when a new command ships or a data source changes.
+
+version: 1
+
+smoke_tests:
+
+  # ---------------------------------------------------------------------------
+  # Theme: YAML artifact correctness
+  #
+  # textsessions produces and consumes several YAML files whose correctness can
+  # only be verified by running end-to-end against real data. Unit tests cover
+  # individual helpers; these smokes confirm the full pipeline.
+  # ---------------------------------------------------------------------------
+
+  - id: yaml-hint-roundtrip
+    shipped_in: "src/textsessions/hints.py + src/textsessions/indexer.py (spec: docs/specs/textsessions-hints.md v0.1.0)"
+    status: needs-testing
+    created: "2026-05-05"
+    updated: "2026-05-05"
+    why: |
+      The hint file is written by an external producer (textprompts) and read by
+      the textsessions indexer. Unit tests mock both sides; only a real run
+      confirms that the YAML is written with the right field names, parsed
+      without loss, persisted into the session index, and surfaced correctly in
+      the CLI/TUI. Persona chips and --persona/--owner/--label filters all depend
+      on this pipeline being intact.
+    setup:
+      - Pick any session id already in the index: ts sessions | head -5
+      - Note its UUID (shown in the ID column with ts sessions --full)
+    run: |
+      SID=<paste-session-uuid>
+      mkdir -p ~/.cache/textsessions/hints
+      cat > ~/.cache/textsessions/hints/$SID.yaml <<'EOF'
+      persona: smoke-test
+      owner: manual:test:run-1
+      labels: [smoke, test]
+      EOF
+      ts index build
+      ts sessions --persona smoke-test
+      ts sessions --owner manual:test:run-1
+      ts sessions --label smoke
+    verify:
+      - "ts sessions --persona smoke-test returns exactly the session with $SID"
+      - "Persona chip shows [persona=smoke-test, #smoke #test] in the row"
+      - "--owner and --label filters each return the same session"
+      - "ts view shows Persona: [persona=smoke-test, #smoke #test] in the detail panel"
+      - "ts index build completes without error or warning"
+    fails_when:
+      - hint file present but session does not appear in --persona filter (indexer missed it)
+      - persona chip shows raw YAML instead of the rendered chip
+      - "--label filter returns no results despite hint having that label"
+      - ts index build raises on a malformed hint file (it should silently skip)
+    teardown: |
+      rm ~/.cache/textsessions/hints/$SID.yaml
+      ts index build
+
+  - id: yaml-checkpoint-header-trailer
+    shipped_in: "src/textsessions/checkpoint.py + src/textsessions/cli.py (spec: docs/specs/textsessions-checkpoint.md v0.1.0)"
+    status: passed
+    created: "2026-05-05"
+    updated: "2026-05-06"
+    why: |
+      The checkpoint log is created by textsessions before spawning and appended
+      to after exit. Unit tests cover the write helpers in isolation; only a real
+      run confirms that the header is well-formed YAML, TS_CHECKPOINT_LOG is
+      actually injected into the claude process env, the system prompt reaches
+      the session, and the trailer is written after exit. The dry-run path
+      exercises everything except the subprocess exec itself.
+    setup:
+      - Add checkpoint_log = true to ~/.config/textsessions/config.toml
+      - Pick a session to resume: ts sessions | head -3
+    run: |
+      SESSION=<session-name>
+      ts jump $SESSION --dry-run
+      cat ~/.local/state/textsessions/checkpoints/<session-uuid>.yaml
+      ts jump $SESSION   # real run — exit the session immediately (ctrl+d or /exit)
+      cat ~/.local/state/textsessions/checkpoints/<session-uuid>.yaml
+    verify:
+      - "--dry-run creates the header YAML at the expected path before printing the command"
+      - "Header contains checkpoint_log: '0.1.0', session_id, started, repo"
+      - "TS_CHECKPOINT_LOG appears in the dry-run command output env"
+      - "--append-system-prompt appears in the dry-run command"
+      - "After real run: trailer block appended with trailer: true, ended, exit_code"
+      - "ts view on the session shows 'Checkpoint: log present' in detail panel"
+      - "TUI row shows [c] chip next to the profile"
+    fails_when:
+      - header file not created before claude spawns (session has no TS_CHECKPOINT_LOG)
+      - trailer not written if session exits with non-zero code
+      - checkpoint_log = false (default) creates no file (regression guard)
+    teardown: |
+      # remove checkpoint_log = true from config to restore default
+      # optionally delete the log: rm ~/.local/state/textsessions/checkpoints/<sid>.yaml
+
+  - id: yaml-session-index-structure
+    shipped_in: "src/textsessions/indexer.py + src/textsessions/sessions.py"
+    status: needs-testing
+    created: "2026-05-05"
+    updated: "2026-05-05"
+    why: |
+      The session index YAML is the source of truth for all ts commands. If
+      its structure drifts (field renames, missing keys, bad types), every
+      command silently degrades. Unit tests load fixture YAML; this smoke
+      confirms a real index build produces parseable, correctly-shaped YAML
+      and that a round-trip (build → load → display) loses nothing.
+    run: |
+      ts index build --verbose
+      python3 -c "
+      import yaml, pathlib
+      state = pathlib.Path.home() / '.local/state/claude-sessions'
+      for f in sorted(state.glob('*.yaml'))[:3]:
+          data = yaml.safe_load(f.read_text()) or {}
+          for sid, entry in list(data.items())[:2]:
+              assert 'name' in entry, f'missing name in {sid}'
+              assert 'last_active' in entry, f'missing last_active in {sid}'
+              print(f'  {sid[:8]}  {entry[\"name\"]}  ok')
+      print('index structure ok')
+      "
+      ts sessions | wc -l
+    verify:
+      - "ts index build --verbose completes without warnings or tracebacks"
+      - "Python assertion loop prints 'index structure ok' for sampled entries"
+      - "ts sessions returns at least as many rows as before the build"
+    fails_when:
+      - index build silently skips all sessions (empty output from ts sessions)
+      - YAML parse error on any index file (malformed output from indexer)
+      - name or last_active missing from any non-new entry (field rename regression)
+
+  - id: yaml-config-roundtrip
+    shipped_in: "src/textsessions/config.py"
+    status: passed
+    created: "2026-05-05"
+    updated: "2026-05-06"
+    why: |
+      config.toml is loaded and saved by textsessions. A save/load round-trip
+      must preserve all fields including new ones (checkpoint_log). Silent
+      field loss is the typical failure mode when a new field is added to the
+      dataclass but not wired into save().
+    run: |
+      cp ~/.config/textsessions/config.toml /tmp/ts-config-backup.toml
+      python3 -c "
+      from textsessions.config import load, save
+      cfg = load()
+      print('checkpoint_log before:', cfg.checkpoint_log)
+      cfg.checkpoint_log = True
+      save(cfg)
+      cfg2 = load()
+      assert cfg2.checkpoint_log == True, 'checkpoint_log lost on save/load'
+      cfg2.checkpoint_log = False
+      save(cfg2)
+      cfg3 = load()
+      assert cfg3.checkpoint_log == False, 'checkpoint_log false not persisted'
+      print('config round-trip ok')
+      "
+    verify:
+      - "'config round-trip ok' printed without assertion errors"
+      - "repos, integrations, ui fields unchanged after round-trip (check diff)"
+    fails_when:
+      - AssertionError on checkpoint_log (field not wired into save())
+      - Any other field silently lost (diff the config file before/after)
+    teardown: |
+      cp /tmp/ts-config-backup.toml ~/.config/textsessions/config.toml
+
+  # ---------------------------------------------------------------------------
+  # Theme: task workflow protocol
+  #
+  # docs/TASKS/ is the per-repo task log directory established by the
+  # task-workflow-template textmap protocol. These smokes confirm the schema
+  # stays valid and the textmap node references resolve.
+  # ---------------------------------------------------------------------------
+
+  - id: yaml-task-log-structure
+    shipped_in: "docs/TASKS/ convention (textmap: task-workflow-template, task-log-paperworlds)"
+    status: passed
+    created: "2026-05-06"
+    updated: "2026-05-06"
+    why: |
+      Task logs in docs/TASKS/ are produced by hand using the textmap template.
+      Required fields can silently go missing when a new log is created from
+      memory rather than the template. This smoke parses every task log and
+      asserts the required schema is present.
+    run: |
+      python3 -c "
+      import yaml, pathlib, sys
+      tasks_dir = pathlib.Path('docs/TASKS')
+      if not tasks_dir.exists():
+          print('no docs/TASKS dir — skip')
+          sys.exit(0)
+      files = sorted(tasks_dir.glob('*.yaml'))
+      if not files:
+          print('no task logs found — skip')
+          sys.exit(0)
+      errors = []
+      for f in files:
+          data = yaml.safe_load(f.read_text()) or {}
+          for field in ('id', 'title', 'status', 'created', 'steps'):
+              if field not in data:
+                  errors.append(f'{f.name}: missing field \"{field}\"')
+          for step in data.get('steps', []):
+              for sf in ('id', 'done'):
+                  if sf not in step:
+                      errors.append(f'{f.name} step {step.get(\"id\", \"?\")}: missing \"{sf}\"')
+      if errors:
+          print('FAIL')
+          for e in errors: print(' ', e)
+          sys.exit(1)
+      print(f'ok — {len(files)} task log(s) valid')
+      "
+    verify:
+      - "Prints 'ok — N task log(s) valid' with no errors"
+      - "Every file in docs/TASKS/ has id, title, status, created, steps"
+      - "Every step entry has id and done fields"
+    fails_when:
+      - A task log was created by hand and is missing a required top-level field
+      - A step entry is missing id or done (e.g. copy-paste error from template)
+      - YAML parse error on any task log file
+
+  - id: yaml-task-log-textmap-refs
+    shipped_in: "docs/TASKS/ convention (textmap: task-workflow-template)"
+    status: needs-testing
+    created: "2026-05-06"
+    updated: "2026-05-06"
+    why: |
+      Each step in a task log carries a comment linking to textmap node IDs.
+      If a node is renamed or removed, the reference silently rots. This smoke
+      extracts node IDs from step comments and queries textmap to confirm they
+      still resolve.
+    run: |
+      python3 -c "
+      import yaml, pathlib, re, subprocess, sys
+      tasks_dir = pathlib.Path('docs/TASKS')
+      node_re = re.compile(r'→\s+([\w-]+(?:,\s*[\w-]+)*)')
+      missing = []
+      for f in sorted(tasks_dir.glob('*.yaml')):
+          text = f.read_text()
+          for match in node_re.finditer(text):
+              for nid in [n.strip() for n in match.group(1).split(',')]:
+                  r = subprocess.run(['textmap', 'query-node', nid],
+                                     capture_output=True, text=True)
+                  if r.returncode != 0:
+                      missing.append(f'{f.name}: node \"{nid}\" not found')
+      if missing:
+          print('FAIL')
+          for m in missing: print(' ', m)
+          sys.exit(1)
+      print('ok — all textmap refs resolve')
+      "
+    verify:
+      - "Prints 'ok — all textmap refs resolve'"
+      - "Every node ID in step comments is a live textmap node"
+    fails_when:
+      - A textmap node was renamed after the task log was written
+      - A node ID was mistyped in a step comment
+
+# Cadence
+#
+# - After any change to indexer.py or sessions.py: run yaml-session-index-structure.
+# - After any change to checkpoint.py or cli.py (_resume_session): run yaml-checkpoint-header-trailer.
+# - After any change to config.py (new field or save/load logic): run yaml-config-roundtrip.
+# - After textprompts ships a new hint producer: run yaml-hint-roundtrip.
+# - After adding a new docs/TASKS/ entry: run yaml-task-log-structure.
+# - After any textmap node rename: run yaml-task-log-textmap-refs.

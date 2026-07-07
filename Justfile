@@ -1,0 +1,80 @@
+default:
+    @just --list
+
+# Run tests
+test:
+    uv run pytest -x -q
+
+# Install as editable uv tool with accounts extra (no venv required)
+install:
+    uv tool install -e ".[accounts]" --force --python 3.13
+
+# Build distribution
+build:
+    uv build
+
+# Launch the TUI
+run:
+    uv run textsessions
+
+# Scan for ghost/orphan sessions
+scan-ghosts repo="":
+    uv run textsessions scan-ghosts {{ if repo != "" { "--repo " + repo } else { "" } }}
+
+# Show session list
+sessions query="":
+    uv run textsessions sessions {{ query }}
+
+# Check that all CLI top-level commands are listed in completions/textsessions.fish
+check-completions:
+    #!/usr/bin/env sh
+    missing=0
+    for cmd in $(uv run textsessions --help | awk '/^Commands:/,0 {if ($1 ~ /^[a-z]/) print $1}'); do
+        if ! grep -q "\"$cmd\"" completions/textsessions.fish; then
+            echo "MISSING from completions: $cmd"
+            missing=1
+        fi
+    done
+    if [ $missing -eq 0 ]; then
+        echo "All commands covered."
+    else
+        exit 1
+    fi
+
+# Install shell completions and aliases (auto-detects fish/zsh/bash)
+install-completions: check-completions
+    #!/usr/bin/env sh
+    shell=$(basename "$SHELL")
+    case "$shell" in
+        fish)
+            dest="$HOME/.config/fish/completions/textsessions.fish"
+            cp completions/textsessions.fish "$dest"
+            echo "Installed fish completions → $dest"
+            mkdir -p "$HOME/.config/fish/functions"
+            for f in completions/functions/*.fish; do
+                cp "$f" "$HOME/.config/fish/functions/$(basename $f)"
+                echo "Installed fish function → $HOME/.config/fish/functions/$(basename $f)"
+            done
+            ;;
+        zsh)
+            dest="${ZDOTDIR:-$HOME}/.zsh/completions/_textsessions"
+            mkdir -p "$(dirname "$dest")"
+            _TEXTSESSIONS_COMPLETE=zsh_source textsessions > "$dest"
+            echo "Installed zsh completions → $dest"
+            echo "Make sure $(dirname $dest) is in your fpath."
+            ;;
+        bash)
+            dest="$HOME/.bash_completion.d/textsessions"
+            mkdir -p "$(dirname "$dest")"
+            _TEXTSESSIONS_COMPLETE=bash_source textsessions > "$dest"
+            echo "Installed bash completions → $dest"
+            ;;
+        *)
+            echo "Unknown shell: $shell. Supported: fish, zsh, bash."
+            exit 1
+            ;;
+    esac
+
+# Show current version
+version:
+    @grep '^version' pyproject.toml | head -1

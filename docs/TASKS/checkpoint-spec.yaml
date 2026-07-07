@@ -1,0 +1,65 @@
+id: checkpoint-spec
+title: "Checkpoint YAML log — per-session structured audit trail"
+status: done
+created: "2026-05-05"
+refs:
+  - forum: spec-textsessions-checkpoint
+  - spec: docs/specs/textsessions-checkpoint.md
+  - thread_origin: "checkpoint-yaml-log-for-textsessions-per-session-structured-"
+
+steps:
+
+  - id: load
+    # tag: workflow  →  task-load-steps
+    done: true
+    notes: |
+      Forum thread: spec-textsessions-checkpoint (open, 2 entries).
+      Original proposal: pinned inbox thread by paulie.
+      No cross-repo dependencies — textsessions owns the spec fully.
+      Consumers: none registered yet (field empty in spec frontmatter).
+
+  - id: log
+    # tag: workflow  →  task-log-paperworlds
+    done: true
+
+  - id: develop
+    # tag: conventions, paperworlds  →  paperagents-standards-bins--conventions
+    done: true
+    notes: |
+      Shipped in v0.13.0. Files created:
+        src/textsessions/checkpoint.py   — CHECKPOINT_DIR, path helpers,
+                                           write_checkpoint_header,
+                                           write_checkpoint_trailer,
+                                           CHECKPOINT_SYSTEM_PROMPT
+        config.py                        — checkpoint_log: bool = False
+        profiles.py                      — resume_cmd gains checkpoint_log_path
+        cli.py / _resume_session         — header before spawn, env var, trailer on exit
+        sessions.py                      — Session.has_checkpoint_log property
+        tui/app.py                       — [c] chip + detail panel line
+      Spec file: docs/specs/textsessions-checkpoint.md (status still "draft" — needs update)
+
+  - id: tests
+    # tag: testing  →  test-like-prod, run-smoke-tests, validate-paperworlds-yaml
+    done: true
+    notes: |
+      Unit: 17 new tests in tests/test_checkpoint.py — 275 total, all passing.
+      yaml-config-roundtrip: PASSED (2026-05-06).
+      yaml-checkpoint-header-trailer: PASSED — dry-run verified + real-run confirmed
+        via daily ts jump usage (trailer write, [c] chip, detail panel).
+      Fix: dry-run now prints TS_CHECKPOINT_LOG env line (cli.py:116-117).
+
+  - id: validate
+    # tag: workflow  →  task-deploy-checklist, proactive-communication
+    done: true
+    checklist:
+      - "Update docs/specs/textsessions-checkpoint.md frontmatter: status draft → implemented  ✓"
+      - "Close forum thread spec-textsessions-checkpoint  ✓"
+    notes: ""
+
+  - id: git
+    # tag: git  →  git-conventions, git-commit-frequently, pre-commit-before-git-commit
+    done: true
+    commits:
+      - "6adfc33 fix: dry-run prints TS_CHECKPOINT_LOG env line; close checkpoint spec"
+    notes: |
+      Remaining: real-run trailer smoke (yaml-checkpoint-header-trailer) — manual only.

@@ -1,0 +1,8 @@
+Decompression error: ZlibError
+Done. Here's what changed:
+
+**`sessions.py`** — `is_orphan` now uses `_HEX_NAME_RE = re.compile(r'^[0-9a-f]{5,8}$')` to match Claude's auto-generated names. The old slug word-count logic is gone.
+
+**`cli.py`** — `scan-ghosts` loses `--min-words` and the local `_is_orphan_custom` override. It now calls `s.is_orphan` directly.
+
+**`test_ghost_detection.py`** — 14 new orphan tests covering: hex hash hits (`c5796`, `ac4b7f3e`), tagged/priority guards, meaningful short names (`pp`, `ws-internal`, `prdx-admin`), long-slug hex-named sessions (now correctly orphaned), and boundary cases (4-char too short, 9-char too long, non-hex chars). All 80 tests pass.

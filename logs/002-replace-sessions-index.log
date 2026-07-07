@@ -1,0 +1,15 @@
+Done. State: **DONE**. Commit `704df0c` pushed.
+
+**Summary of what was completed:**
+
+1. **`indexer.py`** — full port of `claude-sessions-index`: slug helpers, `scan_sessions`, `build_index`, all mutation functions (`do_tag/untag/priority/rename/tags/delete_session`), `load/save_index`, legacy TSV writes. All importable, no subprocess.
+
+2. **`cli.py`** — `textsessions index` subcommand group (build/tag/untag/rename/priority/tags/delete) + `sessions_index_compat` compat entrypoint for the old positional-arg CLI style. `scan-ghosts` now: default=dry-run, `--archive` (recommended, reversible), `--delete` requires `--yes`.
+
+3. **`pyproject.toml`** — `claude-sessions-index` added to `[project.scripts]`.
+
+4. **`tui/app.py`** — all `subprocess.run([SESSIONS_INDEX, ...])` replaced with direct indexer calls. New `D` binding → `_DeleteConfirmModal` for hard delete.
+
+5. **`tui/modals.py`** — `ArchiveModal` is archive-first (Enter/Space=archive, title shows `d=archive  D=delete`). New `_DeleteConfirmModal` for the `D` shortcut.
+
+6. **Tests** — `test_indexer.py` (31 unit tests) + `test_scan_ghosts.py` extended with dry-run, `--archive`, and `--delete` requires `--yes` tests. **55 tests pass.**

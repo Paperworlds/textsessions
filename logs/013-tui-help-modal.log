@@ -1,0 +1,6 @@
+Done. Changes made:
+
+1. **`tui/modals.py`**: Added `HelpModal` class with `HELP_ROWS` listing all 16 keybindings, dismissable via `?`, `escape`, or `q`.
+2. **`tui/app.py`**: Added `Binding("?", "show_help", "Help")` to `BINDINGS`, imported `HelpModal`, and added `action_show_help()` method.
+
+All 100 existing tests pass. Committed and pushed as `6ffb34a`.

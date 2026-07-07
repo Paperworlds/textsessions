@@ -1,0 +1,14 @@
+Done. Here's what was implemented:
+
+**`profiles.py`** (new) — runtime detection helpers:
+- `cloak_available()`, `cloak_profile_dir()`, `list_cloak_profiles()`, `cloak_version()`
+- `aiproxy_available()`, `aiproxy_running()` (100ms socket timeout)
+- `build_launch_env(profile, integrations_enabled)` — injects `CLAUDE_CONFIG_DIR` and/or `ANTHROPIC_BASE_URL`
+
+**`config.py`** — `IntegrationsConfig` dataclass with `cloak`/`aiproxy` toggles, wired into `load()`/`save()`
+
+**`app.py`** — both `action_resume_session` and `action_new_session` now call `build_launch_env`; `SessionDetail.render()` shows a dim hint when cloak isn't installed and the selected profile is non-default
+
+**`cli.py`** — `textsessions profile` group with `status`, `list`, `setup`, `check` subcommands
+
+**`tests/test_profiles.py`** — 12 tests, all passing (77 total across the suite)

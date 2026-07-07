@@ -1,0 +1,17 @@
+Done. Here's a summary of what was implemented:
+
+**`sessions.py`**
+- `CACHE_PATH = STATE_DIR / "_cache.json"` — flat cache alongside the per-repo YAMLs
+- `_cache_is_fresh()` — mtime comparison: cache exists and is newer than every `*.yaml`
+- `_write_cache()` — serialises `id`, `name`, `profile`, `repo_label`, `repo_path` to JSON
+- `_load_cache()` — deserialises back to `Session` objects (missing fields get dataclass defaults)
+- `load_sessions_fast()` — serves from cache if fresh, otherwise falls back to `load_sessions` and writes cache
+
+**`cli.py`**
+- `--resume` path now uses `load_sessions_fast` (single JSON read on cache hit vs N YAML reads)
+- `reindex` command deletes `CACHE_PATH` after rebuilding all indexes
+
+**`indexer.py`**
+- `build_index` deletes `CACHE_PATH` after writing the YAML, covering programmatic callers
+
+**Tests** — 5 new tests in `tests/test_resume_cache.py`; all 91 tests pass.

@@ -1,0 +1,14 @@
+Done. Here's what was shipped in commit `fc239bd`:
+
+**`sessions.py`** — Added a docstring to `is_orphan` explaining the `keep` convention. No code change needed; the existing `if self.tags` guard already excludes tagged sessions.
+
+**`cli.py`** — Two new `scan-ghosts` options:
+- `--keep <prefix>` — resolves the prefix against loaded sessions, tags the match as `keep`, saves the index. Requires `--repo`. Prints `Kept: <short_id>  '<slug>'`.
+- `--discard` — archives all detected orphans/ghosts without the dry-run prompt. Uses the same archive logic as `--archive`. Prints `Archived N orphans in <repo>.` when `--repo` is given.
+
+**`tests/test_scan_ghosts.py`** — Three new tests:
+- `test_keep_tag_excludes_orphan` — unit test that `is_orphan` returns False for a hex-named session with `keep` tag
+- `test_scan_ghosts_keep` — CLI test that `--repo real --keep aaa` tags `a*32` with `keep`
+- `test_scan_ghosts_discard` — CLI test that `--discard` archives orphans and ghosts without prompting
+
+86/86 tests pass.

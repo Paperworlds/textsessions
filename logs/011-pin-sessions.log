@@ -1,0 +1,17 @@
+Done. Here's what was implemented:
+
+**`sessions.py`**
+- `Session.pinned: bool = False` field
+- `_sessions_from_index` reads `pinned` from YAML entry
+- `load_sessions` sorts: pinned first (by `last_active` desc), then rest (by `last_active` desc)
+- `sort_by_priority` same split: pinned block first, then unpinned block
+
+**`indexer.py`**
+- `do_pin(index, session_id, pinned)` — sets `pinned: true` or removes the key
+
+**`tui/app.py`**
+- `Binding("x", "pin_session", "Pin")`
+- `action_pin_session()` — toggles pin, saves index, reloads, notifies "Pinned"/"Unpinned"
+- `★` prefix in name column for pinned sessions
+
+**Tests** — 9 new tests in `test_pin_sessions.py`, 100 total passing.

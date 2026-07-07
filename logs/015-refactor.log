@@ -1,0 +1,13 @@
+All 5 tasks complete. Here's a summary:
+
+**Task 1** — `indexer.py` `build_index()` now preserves `priority`, `tags`, `pinned`, `archived`, and `name` via a single loop. New test `test_build_index_preserves_all_user_fields` verifies all five fields survive a second build.
+
+**Task 2** — `mutate_index(repo_key, session_id, fn)` added to `indexer.py`. All 5 mutation sites in `app.py` (tag, priority, rename, archive, pin) updated to use it.
+
+**Task 3** — `_refresh_view()` = `_apply_filter()` + `_populate_table()` added. `_reload_sessions()` now calls `_refresh_view()`. All paired call sites collapsed to one call.
+
+**Task 4** — `_sort_sessions(sessions, by_priority=False)` extracted in `sessions.py`. Both `load_sessions` and `sort_by_priority` delegate to it.
+
+**Task 5** — All 16 `action_*` methods moved to `tui/actions.py` as `ActionsMixin`. `TextSessionsApp` inherits `(ActionsMixin, App)`. `app.py` reduced from ~590 → 335 lines.
+
+101/101 tests pass. 5 commits pushed.

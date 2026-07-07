@@ -1,0 +1,112 @@
+# textsessions — feature map
+#
+# This file describes the features and use cases of textsessions.
+# It is designed to be read by humans and by Claude Code.
+#
+# built_for: Claude Code only (claude.ai/code)
+# tested_with: claude-sonnet, claude-opus (via Claude Code CLI)
+
+name: textsessions
+tagline: Terminal UI and CLI for managing Claude Code sessions across multiple Git repos
+built_for: Claude Code (claude.ai/code)
+note: >
+  textsessions reads, indexes, and manages the .jsonl session files that Claude Code
+  writes to disk. It is not compatible with other AI coding assistants.
+
+features:
+
+  - name: Session Browser TUI
+    command: textsessions
+    description: >
+      Full-screen terminal UI showing all Claude Code sessions grouped by repo,
+      sorted by last-active. Searchable, filterable, and keyboard-driven.
+    use_cases:
+      - You have 50+ sessions across 10 repos and need to find the one where you
+        were debugging the auth middleware last week
+      - You want a single place to see all active work across every project
+      - You want to resume a session without remembering its hex ID
+
+  - name: Session Resume
+    command: textsessions sessions --resume <name>
+    description: >
+      Resume any named session directly from the CLI or by pressing Enter in the TUI.
+      Suspends the TUI, launches Claude Code in the session, and returns when done.
+    use_cases:
+      - Daily workflow: open textsessions, pick up where you left off
+      - Resume a specific session from a fish shell script or alias
+
+  - name: Tagging and Priority
+    commands: [t (TUI), p (TUI)]
+    description: >
+      Tag sessions with arbitrary labels and set priority levels (H0 = urgent, 1–3).
+      Persistent across reindexes. Filterable in both TUI and CLI.
+    use_cases:
+      - Tag sessions by feature branch, ticket, or area (e.g. "auth", "infra", "bug")
+      - Mark a session H0 to surface it at the top when you return Monday morning
+      - Filter to all sessions tagged "review" across repos
+
+  - name: AI Search
+    command: textsessions search "<natural language query>"
+    description: >
+      Sends session metadata to Claude and returns ranked matches. Useful when you
+      remember what you were doing but not the session name.
+    use_cases:
+      - "textsessions search 'the session where I added the rate limiter'"
+      - "textsessions search 'postgres migration' --repo mono"
+
+  - name: Ghost and Orphan Cleanup
+    command: textsessions scan-ghosts
+    description: >
+      Detects ghost sessions (repo no longer exists on disk) and orphan sessions
+      (auto-named hex IDs with no user interaction). Offers archive or hard delete.
+    use_cases:
+      - After deleting or moving a repo, clean up its leftover sessions
+      - Periodically trim throwaway sessions that accumulated during exploration
+      - Dry-run first to preview what would be removed
+
+  - name: Auto-rename from /rename
+    command: textsessions index auto-rename
+    description: >
+      Claude Code's /rename command writes a rename event into the .jsonl file.
+      textsessions picks this up and applies it to the session index automatically.
+    use_cases:
+      - You renamed a session inside Claude with /rename — sync it to the index
+      - Bulk-apply all pending renames across all repos at once
+
+  - name: Multi-repo and Profile Routing
+    description: >
+      Each repo can have a profile. When launching a session, textsessions resolves
+      the claude_cmd template with the profile (e.g. claude-{profile}) so different
+      repos can use different API keys, base URLs, or shell environments.
+    use_cases:
+      - Work repos use a corporate API key; personal repos use a personal key
+      - Route to ai-proxy for token tracking on work sessions only
+
+  - name: Native Profile Management (textaccounts)
+    command: ta switch <profile>
+    description: >
+      Manage multiple Claude Code accounts as fully isolated config directories.
+      Each profile preserves session history, project memory, and credentials
+      independently. Adopt existing directories without data movement.
+    use_cases:
+      - Keep Claude config (settings, keybindings, memory) separate per profile
+      - Switch between work and personal accounts without manual config swapping
+      - Run parallel Claude sessions with different API keys or base URLs
+
+  - name: Token Proxy Stats
+    command: textsessions proxy
+    description: >
+      If ai-proxy (text-proxy) is running locally, shows token usage and cost
+      for today broken down by model. Also visible in the TUI detail panel.
+    use_cases:
+      - Track daily Claude API spend without leaving the terminal
+      - See which model (sonnet vs opus) you are using most
+
+  - name: Session Tree Export
+    command: textsessions tree
+    description: >
+      Exports a YAML or JSON tree of all repos and their sessions. Useful for
+      scripting, reporting, or feeding into other tools.
+    use_cases:
+      - Feed session data into a script that generates a weekly work summary
+      - Export to JSON for a custom dashboard

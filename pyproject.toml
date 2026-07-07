@@ -1,0 +1,72 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "textsessions"
+version = "0.14.1"
+description = "A Textual TUI for managing Claude Code sessions"
+readme = "README.md"
+requires-python = ">=3.13"
+license = "MIT"
+authors = [
+    { name = "Paolo D'Onorio De Meo", email = "p.donoriodemeo@gmail.com" },
+]
+keywords = ["claude", "claude-code", "anthropic", "sessions", "tui", "textual", "agents"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console :: Curses",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development",
+    "Topic :: Terminals",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "click>=8.0",
+    "pyyaml>=6.0",
+    "rich>=13.0",
+    "textual>=0.70",
+    "tomli>=2.0; python_version < '3.11'",
+    "tomli-w>=1.0",
+]
+
+[project.optional-dependencies]
+accounts = [
+    "textaccounts>=0.4.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/paperworlds/textsessions"
+Repository = "https://github.com/paperworlds/textsessions"
+Issues = "https://github.com/paperworlds/textsessions/issues"
+
+[project.scripts]
+textsessions = "textsessions.cli:main"
+ts = "textsessions.cli:main"
+xts = "textsessions.cli:main"
+claude-sessions-index = "textsessions.cli:sessions_index_compat"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/textsessions"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-asyncio>=0.24",
+    "textaccounts>=0.4.1",
+]
+
+[tool.uv.sources]
+textaccounts = { path = "../textaccounts", editable = true }
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "tests"]
+asyncio_mode = "auto"
