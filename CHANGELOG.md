@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+## v0.15.0
+
+- fix: `detect_claude_dirs()` now also discovers textaccounts-managed profiles whose `CLAUDE_CONFIG_DIR` lives outside `~/.claude*` (e.g. `~/.local/paperworlds/textaccounts/profiles/<name>`) — sessions launched under such a profile were invisible to `ts sessions`/`ts reindex` permanently, not just until the next scan
 - feat: `--no-proxy` on `ts new` and `ts jump`, plus TUI `R` (resume direct) — launch a session direct-to-Anthropic, bypassing textproxy. Required for Claude Code Remote Control and any feature Anthropic gates behind a non-Anthropic `ANTHROPIC_BASE_URL`.
 - feat: `build_launch_env(force_no_proxy=True)` now actively strips an inherited `ANTHROPIC_BASE_URL` (previously, disabling textproxy only skipped setting it)
 

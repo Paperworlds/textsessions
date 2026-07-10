@@ -172,11 +172,32 @@ def repo_key(path: Path) -> str:
 
 
 def detect_claude_dirs() -> list[Path]:
-    """Find all ~/.claude-* profile directories."""
-    return sorted(
+    """Find all Claude Code config directories.
+
+    Includes plain ~/.claude-* profiles as well as textaccounts-managed
+    profiles, whose CLAUDE_CONFIG_DIR can live outside ~/.claude* (e.g.
+    under ~/.local/paperworlds/textaccounts/profiles/<name>). Without the
+    latter, sessions launched under a textaccounts profile are invisible to
+    every reindex forever, not just stale until the next scan.
+    """
+    dirs = {
         p for p in Path.home().glob(".claude*")
         if p.is_dir() and not p.is_symlink()
-    )
+    }
+
+    from .profiles import env_for_profile, list_textaccounts_profiles
+
+    for name in list_textaccounts_profiles():
+        try:
+            config_dir = env_for_profile(name).get("CLAUDE_CONFIG_DIR")
+        except Exception:
+            continue
+        if config_dir:
+            p = Path(config_dir)
+            if p.is_dir():
+                dirs.add(p)
+
+    return sorted(dirs)
 
 
 def discover_repos_for_dir(claude_dir: Path) -> list[Path]:
